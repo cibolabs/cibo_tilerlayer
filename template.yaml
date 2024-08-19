@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  cibo_tilerlayer
+
+  Sample SAM Template for cibo_tilerlayer
+
+Parameters:
+  Environment:
+    Type: String
+    Default: notset
+    Description: (Required) Enter dev, prod.
+
+Resources:
+  CiboTilerLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/gdal
+      CompatibleArchitectures:
+        - arm64
+      CompatibleRuntimes:
+        - python3.12
+      # TODO different names for different architectures?
+      LayerName: !Sub 'CiboTilerLayer${Environment}'
+    Metadata:
+      BuildMethod: makefile
+
+Outputs:
+  LayerARN:
+    Description: "Base Cibo Layer ARN"
+    Value: !Ref CiboTilerLayer 
+    Export:
+      Name: !Sub "CiboTilerLayerARN-${Environment}"
