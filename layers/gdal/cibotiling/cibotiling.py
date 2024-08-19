@@ -1,6 +1,5 @@
 """
-Common classes and functions for creating AWS Lambda entry points
-for retrieving image data using the 'tuiserver' protocol.
+Supporting functions for creating a tiler.
 """
 
 import io
