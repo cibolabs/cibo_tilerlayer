@@ -1,5 +1,15 @@
 """
 Supporting functions for creating a tiler.
+
+Based on code from TuiView. 
+
+Main function is getTile(). An application may want to call
+createColorMapFromIntervals()/createColorMapFromPoints() to obtain
+a colormap in the correct format to getTile(). 
+
+The other functions in this module are for internal use
+and not intended for use by an application.
+
 """
 
 import io
@@ -19,14 +29,48 @@ MERCATOR_Y_ORIGIN = 20037508.342789244
 
 
 def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None, 
-        resampling='near'):
+        resampling='near', fmt='PNG'):
     """
-    Main function. 
+    Main function. By opening the given file the correct web mercator
+    tile is selected and extracted and converted into an image
+    format using the methods definited by the parameters to this function.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the file to extract the tile from. This file should be
+        in webmercator (EPSG:3857) projection. Use a path starting with
+        /vsis3 to open from an S3 bucket. The Lambda must be set up with 
+        the correct permissions to access this file.
+    z : int
+        Zoom level
+    x : int
+        X position on the web mercator grid
+    y : int
+        Y position on the web mercator grid
+    bands : None or sequence of ints, optional
+        Passing None will result in all bands being read from the file.
+        Otherwise a sequence of 1-based band indices are required. 
+        Note that if you are passing a colormap there needs to be only
+        one band, otherwise 3 (and only 3) are reuqired.
+    rescaling : sequence of (float, float) tuples, optional
+        If the data is to be stretched, pass the range of values that
+        the data is to be linearly stretched between. This should be the
+        same length as 'bands'. Cannot be passed if colormap is used.
+    colormap : numpy.array, optional
+        A numpy array of shape (4, maxPixelValue) that defines the colormap
+        to be applied to a single band image.
+    resampling : str
+        Name of resampling method to be used when zoomed in more than the 
+        image supported. Currently only 'near' is supported.
+    fmt : str
+        Name of GDAL driver that creates the image format that needs to be
+        returned. Defaults to 'PNG'
     
-    bands is None for all bands or a list of index-1 values
-    rescaling is None for no rescaling or list of (minVal, maxVal) tuples. Linear stretch applied
-    colormap is a 2d array of shape (4, maxImageVal) with the RGBA values to apply to the data
-    TODO: resampling
+    Returns:
+    io.BytesIO
+        The binary data that contains the image tile.
+
     """
     ds = gdal.Open(filename)
     metadata = Metadata(ds)
@@ -49,7 +93,8 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         raise ValueError('invalid number of bands')
 
     data, dataslice = getRawImageChunk(ds, metadata, 
-        TILE_SIZE, TILE_SIZE, tlx, tly, brx, bry, bands)
+        TILE_SIZE, TILE_SIZE, tlx, tly, brx, bry, bands,
+        resampling)
 
     # output MEM dataset to write into
     mem = gdal.GetDriverByName('MEM').Create('', TILE_SIZE, 
@@ -95,14 +140,95 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         band = mem.GetRasterBand(4)
         band.Fill(255)
 
-    return createPNGBytesIOFromMEM(mem)
+    result = createBytesIOFromMEM(mem, fmt)
+    return result
 
 
-def createPNGBytesIOFromMEM(mem):
+def createColorMapFromIntervals(intervals):
+    """
+    Helper function to convert a list of 
+    ((minVal, maxVal), (r, g, b, a))
+    tuples to a colormap expected by getTile()
+    Note that the intervals list should be ordered
+    by value.
+
+    Parameters
+    ----------
+    intervals : sequence of ((min, max), (r, g, b, a)) tuples.
+        This defines the colours for each interval. Is expected
+        to be sorted. Note that undefined results will occurr
+        if there are missing ranges in the intervals.
+
+    Returns
+    -------
+    numpy.ndarray
+        A colormap of shape (4, maxPixVal).
+        
+
+    """
+    lastValues, _ = intervals[-1]
+    maxVal = lastValues[1]
+    result = numpy.empty((4, maxVal), dtype=numpy.uint8)
+
+    for values, rgba in intervals:
+        minVal, maxVal = values
+        for idx, col in enumerate(rgba):
+            result[idx, minVal:maxVal] = col
+
+
+def createColorMapFromPoints(points):
+    """
+    Helper function to convert a list of
+    (value, (r, g, b, a))
+    tuples to a colormap expected by getTile()
+    colors between these values are interpolated.
+    It is expected that the list is sorted.
+
+    Parameters
+    ----------
+    points : sequence of (value, (r, g, b, a)) tuples
+        The points to interpolate the rest of the
+        values from.
+
+    Returns
+    -------
+    numpy.ndarray
+        A colormap of shape (4, maxPixVal).
+
+    """
+    lastValue, _ = points[-1]
+    result = numpy.empty((4, lastValue), dtype=numpy.uint8)
+
+    xobs = numpy.array([val for val, _ in points])
+    xinterp = numpy.linspace(0, lastValue, lastValue + 1)
+    for idx in range(4):
+        # TODO: does it make sense to use interpolation for Alpha?
+        yobs = [rgba[idx] for _, rgba in points]
+        yinterp = numpy.interp(xinterp, xobs, yobs)
+        result[idx] = yinterp
+    return result
+
+
+def createBytesIOFromMEM(mem, fmt):
     """
     Given a GDAL in memory dataset ("MEM" driver)
-    convert to a PNG and dump as a io.BytesIO for returning
+    convert to the given format and dump as a io.BytesIO for returning
     to client.
+
+    Parameters
+    ----------
+    mem : GDALDataset
+        An open GDAL Dataset object for the 'MEM' driver that
+        has the data to be turned into a BytesIO.
+    fmt : str
+        Name of GDAL driver that creates the image format that needs to be
+        returned. 
+
+    Returns
+    -------
+    io.BytesIO
+        The binary data that contains the image tile.
+
     """
     # ensure all data written
     mem.FlushCache()
@@ -115,7 +241,7 @@ def createPNGBytesIOFromMEM(mem):
     # make the filename unique to this thread
     memName = '/vsimem/output_%d.png' % threading.get_ident()
 
-    ds = gdal.GetDriverByName('PNG').CreateCopy(memName, mem)
+    ds = gdal.GetDriverByName(fmt).CreateCopy(memName, mem)
     ds.FlushCache()
     
     f = gdal.VSIFOpenL(memName, 'rb')
@@ -133,9 +259,21 @@ def createPNGBytesIOFromMEM(mem):
 
 
 # overview stuff from tuiview
-class OverviewInfo(object):
+class OverviewInfo:
     """
-    Stores size and index of an overview
+    Stores size and index of an overview.
+
+    Parameters
+    ----------
+    xsize : int
+        Number of columns in the overview
+    ysize : int
+        Numer of rows inthe overview
+    fullrespixperpix : float
+        Number of pixels at full resolution that each
+        overview pixel covers
+    index : int
+        The index of the overview. 0 is the full res image.
     """
     def __init__(self, xsize, ysize, fullrespixperpix, index):
         self.xsize = xsize
@@ -144,17 +282,19 @@ class OverviewInfo(object):
         self.index = index
 
 
-class OverviewManager(object):
+class OverviewManager:
     """
     This class contains a list of valid overviews
     and allows the best overview to be retrieved
+
+    Attributes
+    ----------
+    overviews : list of OverviewInfo instances
+        The overviews
+
     """
     def __init__(self):
         self.overviews = None
-
-    def getFullRes(self):
-        "Get the full res overview - ie the non overview image"
-        return self.overviews[0]
 
     def loadOverviewInfo(self, ds, bands):
         """
@@ -162,6 +302,14 @@ class OverviewManager(object):
         bands should be a list or tuple of band indices.
         Checks are made that all lists bands contain the
         same sized overviews
+
+        Parameters
+        ----------
+        ds : GDALDataset object
+            The file to load the overviews in from
+        bands : sequence of int
+            The bands we are interested in
+
         """
         # i think we can assume that all the bands are the same size
         # add an info for the full res - this should always be location 0
@@ -201,6 +349,17 @@ class OverviewManager(object):
     def findBestOverview(self, imgpixperwinpix):
         """
         Finds the best overview for given imgpixperwinpix
+
+        Parameters
+        ----------
+        imgpixperwinpix : float
+            The number of image pixels per pixels we want to display
+
+        Returns
+        -------
+        Instance of OverviewInfo
+            The overview that most closely matches (but has more
+            pixels than required) the requested imgpixperwinpix
         """
         selectedovi = self.overviews[0]
         for ovi in self.overviews[1:]:
@@ -213,13 +372,38 @@ class OverviewManager(object):
         return selectedovi
 
 
-class Metadata(object):
+class Metadata:
     """
     Class that holds all the 'metadata' about an object (ie size, projection etc)
-    and this can be passed to the browser in one chunk.
+    and can be passed around without re-requesting the data again.
+
+    Parameters
+    ----------
+    ds : GDALDataset 
+        Dataset to query
+
+    Attributes
+    ----------
+    RasterXSize : int
+        X Size of raster
+    RasterYSize : int
+        Y Size of raster
+    RasterCount : int
+        Number of bands
+    thematic : bool
+        Whether image is thematic or not
+    transform : sequence of floats
+        the geo transform of the image
+    allIgnore : sequence of float
+        The ignore value (or None if not set) for each band
+    overviews : OverviewManager
+        Information about the overview
+    tlx, tly, brx, bry : floats
+        Bounding box of the image in projected coords
+    iInverse : sequence of floats
+        The inverse geo transform of the image
     """
-    def __init__(self, ds, timeToOpen=-999):
-        self.timeToOpen = timeToOpen
+    def __init__(self, ds):
         self.RasterXSize = ds.RasterXSize
         self.RasterYSize = ds.RasterYSize
         self.RasterCount = ds.RasterCount
@@ -245,8 +429,6 @@ class Metadata(object):
         self.tInverse = gdal.InvGeoTransform(self.transform)
 
 
-# See https://chao-ji.github.io/jekyll/update/2018/07/19/BilinearResize.html
-# for bilinear alternative
 def replicateArray(arr, outsize, dspLeftExtra, dspTopExtra, dspRightExtra, 
         dspBottomExtra):
     """
@@ -259,6 +441,26 @@ def replicateArray(arr, outsize, dspLeftExtra, dspTopExtra, dspRightExtra,
     top and left. dspRightExtra, dspBottomExtra are the number of pixels
     to be shaved off the bottom and right of the result. This allows us
     to display fractional pixels.
+
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        2 dimenensional input data
+    outsize : tuple of int
+        The output size (xsize, ysize)
+    dspLeftExtra : int
+        number of pixels to be shaved off the left
+    dspTopExtra : int
+        number of pixels to be shaved off the top
+    dspRightExtra : int
+        number of pixels to be shaved off the right
+    dspBottomExtra : int
+        number of pixels to be shaved off the bottom
+
+    Returns
+    -------
+    numpy.ndarray
+
     """
     (ysize, xsize) = outsize
     (nrows, ncols) = arr.shape
@@ -293,6 +495,25 @@ def replicateArray(arr, outsize, dspLeftExtra, dspTopExtra, dspRightExtra,
 def pixel2displayF(col, row, origCol, origRow, imgPixPerWinPix):
     """
     From tuiview - convert pixel coordinates to display as float
+
+    Parameters
+    ----------
+    col : int
+        The column
+    row : int
+        The row
+    origCol : int
+        The column of the origin of the tile
+    origRow : int
+        The row of the origin of the tile
+    imgPixPerWinPix : float
+        The number of image pixels per tile pixel
+
+    Returns
+    -------
+    tuple of float
+        (x, y)
+
     """
     x = (col - origCol) / imgPixPerWinPix
     y = (row - origRow) / imgPixPerWinPix
@@ -302,24 +523,83 @@ def pixel2displayF(col, row, origCol, origRow, imgPixPerWinPix):
 def pixel2display(col, row, origCol, origRow, imgPixPerWinPix):
     """
     From tuiview - convert pixel coordinates to display - integer version
+
+    Parameters
+    ----------
+    col : int
+        The column
+    row : int
+        The row
+    origCol : int
+        The column of the origin of the tile
+    origRow : int
+        The row of the origin of the tile
+    imgPixPerWinPix : float
+        The number of image pixels per tile pixel
+
+    Returns
+    -------
+    tuple of int
+        (x, y)
     """
     x = int((col - origCol) / imgPixPerWinPix)
     y = int((row - origRow) / imgPixPerWinPix)
     return (x, y)
 
 
-def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands):
+def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
+        resampling):
     """
     Also adapted from tuiview. returns requested chunk of image. Returns 
     the data and the dataslice that the data fits into the (ysize, xsize)
-    output data (caller to do this). data can be None - no data for requested
-    bounds. 
+    output data.
+
+    Parameters
+    ----------
+    ds : GDALDataset
+        File to read the data from
+    metadata : Metadata
+        Metadata for the file
+    xsize : int
+        Number of columns to return
+    ysize : int
+        Number of rows to return
+    tlx, tly, brx, bry : floats
+        The bounds of the image in projected coords
+    bands : sequence of ints
+        The bands to read from
+    resampling : str
+        Name of resampling method to be used when zoomed in more than the 
+        image supported. Currently only 'near' is supported.
+
+    Returns
+    -------
+    tuple 
+        The output data and slice. The first element of the tuple is the data
+        read from the file. This may be None if the requested bounds are outside 
+        of the file. If a single band was requested this will be a 2 dimensional
+        array, otherwise it will be 3 dimensional
+        The second element of the tuple is a slice object that defines where
+        in the output tile to write the data. If the size of the returned
+        data array is smaller than (ysize, xsize) this will be the location
+        in the tile to write the data. For situations where only part of the
+        requested bounds is within the image.
+
     """
-    # then pixel/row
+    resampleMethod = None
+    if resampling == 'near':
+        resampleMethod = replicateArray
+    else:
+        # See https://chao-ji.github.io/jekyll/update/2018/07/19/BilinearResize.html
+        # for bilinear alternative
+        raise ValueError('Unknown resample method {}'.format(resampling))
+
+    # work out number of pixels
     imgPix_x = (brx - tlx) / metadata.transform[1]
     imgPix_y = (bry - tly) / metadata.transform[5]
     imgPixPerWinPix = imgPix_x / xsize
 
+    # now work out which overview to use
     origPixLeft, origPixTop = gdal.ApplyGeoTransform(metadata.tInverse, tlx, tly)
     origPixRight = origPixLeft + imgPix_x
     origPixBottom = origPixTop + imgPix_y
@@ -409,7 +689,7 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands):
             else:
                 dataTmp = band.ReadAsArray(ovleft, ovtop, 
                         ovxsize, ovysize)
-                data = replicateArray(dataTmp, (dspRastYSize, dspRastXSize), 
+                data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                     dspLeftExtra, dspTopExtra, dspRightExtra,
                          dspBottomExtra)
 
@@ -427,7 +707,7 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands):
                 else:
                     dataTmp = band.ReadAsArray(ovleft, ovtop, 
                             ovxsize, ovysize)
-                    data = replicateArray(dataTmp, (dspRastYSize, dspRastXSize), 
+                    data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                                 dspLeftExtra, dspTopExtra, dspRightExtra,
                                 dspBottomExtra)
 
