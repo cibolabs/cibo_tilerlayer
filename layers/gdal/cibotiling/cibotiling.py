@@ -19,8 +19,9 @@ from osgeo import gdal
 
 gdal.UseExceptions()
 
-
+# TODO: should this be set somewhere else?
 TILE_SIZE = 256
+
 # Don't use the numbers from: http://epsg.io/3857
 # The correct numbers are here: https://github.com/OSGeo/gdal/blob/master/gdal/swig/python/gdal-utils/osgeo_utils/gdal2tiles.py#L278
 # Not sure why the difference...
