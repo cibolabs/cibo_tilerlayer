@@ -5,11 +5,26 @@ Description: >
 
   Sample SAM Template for cibo_tilerlayer
 
+Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.12
+
 Parameters:
   Environment:
     Type: String
     Default: notset
     Description: (Required) Enter dev, prod.
+  HasFunction:
+    Type: String
+    Default: false
+    AllowedValues:
+      - false
+      - true
+
+Conditions:
+  CondHasFunction: !Equals [!Ref HasFunction, true]
 
 Resources:
   CiboTilerLayer:
@@ -24,6 +39,64 @@ Resources:
       LayerName: !Sub 'CiboTilerLayer${Environment}'
     Metadata:
       BuildMethod: makefile
+
+  # Needed even though we just test the function in 'local' mode
+  # Otherwise binary png is returned as base64
+  TestAPI:
+    Type: AWS::Serverless::Api
+    Condition: CondHasFunction
+    DependsOn: TestFunction
+    Properties:
+      StageName: dev
+      BinaryMediaTypes:
+        - 'image~1png'
+
+  TestFunction:
+    Type: AWS::Serverless::Function
+    Condition: CondHasFunction
+    DependsOn: CiboTilerLayer
+    Connectors:
+      BucketCon:
+        Properties:
+          Destination:
+            Type: AWS::S3::Bucket
+            Arn: arn:aws:s3:::cibo-test-oregon
+          Permissions:
+            - Read
+    Properties:
+      FunctionName: TestCiboTiler
+      Handler: app.lambda_handler
+      CodeUri: tilertest
+      Description: Tester for CiboTilerLayer
+      Architectures:
+        - arm64
+      Events:
+        CatchAll:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: GET
+            RestApiId: !Ref TestAPI
+      Layers:
+        - !Ref CiboTilerLayer
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: PowertoolsOziusAPI
+          POWERTOOLS_METRICS_NAMESPACE: API
+          POWERTOOLS_LOG_LEVEL: INFO
+          LD_LIBRARY_PATH: "/opt/python/lib:/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/opt/lib"
+          GDAL_DATA: "/opt/python/share/gdal"
+          PROJ_LIB: "/opt/python/share/proj"
+          GDAL_CACHEMAX: "75%"
+          VSI_CACHE: "TRUE"
+          VSI_CACHE_SIZE: "536870912"
+          GDAL_DISABLE_READDIR_ON_OPEN: "TRUE"
+          CPL_VSIL_CURL_ALLOWED_EXTENSIONS: ".tif,.tif.aux.xml,.vrt"
+          GDAL_MAX_DATASET_POOL_SIZE: "512"
+          CPL_TMPDIR: "/tmp"
+          GDAL_FORCE_CACHING: "YES"
+          GDAL_HTTP_MAX_RETRY: "10"
+          GDAL_HTTP_RETRY_DELAY: "1"
 
 Outputs:
   LayerARN:

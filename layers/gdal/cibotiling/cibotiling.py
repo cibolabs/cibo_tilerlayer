@@ -19,8 +19,8 @@ from osgeo import gdal
 
 gdal.UseExceptions()
 
-# TODO: should this be set somewhere else?
-TILE_SIZE = 256
+
+MERCATOR_TILE_SIZE = 512
 
 # Don't use the numbers from: http://epsg.io/3857
 # The correct numbers are here: https://github.com/OSGeo/gdal/blob/master/gdal/swig/python/gdal-utils/osgeo_utils/gdal2tiles.py#L278
@@ -30,7 +30,7 @@ MERCATOR_Y_ORIGIN = 20037508.342789244
 
 
 def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None, 
-        resampling='near', fmt='PNG'):
+        resampling='near', fmt='PNG', tileSize=256, logger=None):
     """
     Main function. By opening the given file the correct web mercator
     tile is selected and extracted and converted into an image
@@ -67,6 +67,9 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
     fmt : str
         Name of GDAL driver that creates the image format that needs to be
         returned. Defaults to 'PNG'
+    tileSize : int
+        Size in pixels of the returned tile. The returned tile will be this
+        size in both the x and y dimensions.
     
     Returns:
     io.BytesIO
@@ -80,12 +83,14 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
 
     # https://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-mercator
     units_per_pixel = 78271.516 / 2**int(z)
-    tile_size = units_per_pixel * TILE_SIZE
+    tile_size = units_per_pixel * MERCATOR_TILE_SIZE
     
     tlx = MERCATOR_X_ORIGIN + (tile_size * int(x))
     tly = MERCATOR_Y_ORIGIN - (tile_size * int(y))
     brx = tlx + tile_size
     bry = tly - tile_size
+    if logger is not None:
+        logger.info('coord', tlx=tlx, tly=tly, brx=brx, bry=bry)
 
     # bands
     if bands is None:
@@ -94,12 +99,18 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         raise ValueError('invalid number of bands')
 
     data, dataslice = getRawImageChunk(ds, metadata, 
-        TILE_SIZE, TILE_SIZE, tlx, tly, brx, bry, bands,
+        tileSize, tileSize, tlx, tly, brx, bry, bands,
         resampling)
+    if logger is not None:
+        if data is not None:
+            logger.info('data', data=data.shape, minv=data.min(), 
+                maxv=data.max(), dataslice=dataslice)
+        else:
+            logger.info('datanull')
 
     # output MEM dataset to write into
-    mem = gdal.GetDriverByName('MEM').Create('', TILE_SIZE, 
-        TILE_SIZE, 4, gdal.GDT_Byte)
+    mem = gdal.GetDriverByName('MEM').Create('', tileSize, 
+        tileSize, 4, gdal.GDT_Byte)
 
     alphaset = False
     if data is None:
@@ -109,7 +120,7 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
             band.Fill(0)
         alphaset = True
     else:
-        imgData = numpy.zeros((TILE_SIZE, TILE_SIZE), dtype=numpy.uint8)
+        imgData = numpy.zeros((tileSize, tileSize), dtype=numpy.uint8)
         # rescale.
         if rescaling is not None:
             if len(rescaling) == 1:
@@ -130,7 +141,7 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         elif colormap is not None:
             # Note: currently can't specify rescaling AND colormap
             for n in range(4):
-                imgData[dataslice] = colormap[n][data[n]]
+                imgData[dataslice] = colormap[n][data]
                 band = mem.GetRasterBand(n + 1)
                 band.WriteArray(imgData)
             alphaset = True
@@ -175,6 +186,7 @@ def createColorMapFromIntervals(intervals):
         minVal, maxVal = values
         for idx, col in enumerate(rgba):
             result[idx, minVal:maxVal] = col
+    return result
 
 
 def createColorMapFromPoints(points):
