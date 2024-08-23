@@ -30,7 +30,7 @@ MERCATOR_Y_ORIGIN = 20037508.342789244
 
 
 def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None, 
-        resampling='near', fmt='PNG', tileSize=256, logger=None):
+        resampling='near', fmt='PNG', tileSize=256):
     """
     Main function. By opening the given file the correct web mercator
     tile is selected and extracted and converted into an image
@@ -89,8 +89,6 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
     tly = MERCATOR_Y_ORIGIN - (tile_size * int(y))
     brx = tlx + tile_size
     bry = tly - tile_size
-    if logger is not None:
-        logger.info('coord', tlx=tlx, tly=tly, brx=brx, bry=bry)
 
     # bands
     if bands is None:
@@ -101,12 +99,6 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
     data, dataslice = getRawImageChunk(ds, metadata, 
         tileSize, tileSize, tlx, tly, brx, bry, bands,
         resampling)
-    if logger is not None:
-        if data is not None:
-            logger.info('data', data=data.shape, minv=data.min(), 
-                maxv=data.max(), dataslice=dataslice)
-        else:
-            logger.info('datanull')
 
     # output MEM dataset to write into
     mem = gdal.GetDriverByName('MEM').Create('', tileSize, 
