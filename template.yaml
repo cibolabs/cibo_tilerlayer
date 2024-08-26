@@ -16,15 +16,6 @@ Parameters:
     Type: String
     Default: notset
     Description: (Required) Enter dev, prod.
-  HasFunction:
-    Type: String
-    Default: false
-    AllowedValues:
-      - false
-      - true
-
-Conditions:
-  CondHasFunction: !Equals [!Ref HasFunction, true]
 
 Resources:
   CiboTilerLayer:
@@ -39,12 +30,12 @@ Resources:
       LayerName: !Sub 'CiboTilerLayer${Environment}'
     Metadata:
       BuildMethod: makefile
+      BuildArchitecture: arm64
 
   # Needed even though we just test the function in 'local' mode
   # Otherwise binary png is returned as base64
   TestAPI:
     Type: AWS::Serverless::Api
-    Condition: CondHasFunction
     DependsOn: TestFunction
     Properties:
       StageName: dev
@@ -53,7 +44,6 @@ Resources:
 
   TestFunction:
     Type: AWS::Serverless::Function
-    Condition: CondHasFunction
     DependsOn: CiboTilerLayer
     Connectors:
       BucketCon:

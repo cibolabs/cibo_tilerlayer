@@ -33,4 +33,3 @@ in the test function.
 Use `test-deploy.py -m deploy` to deploy (the hopefully tested) Lambda function. 
 Note that whether the dev or prod mode is used is controlled by the `--environment` switch.
 
-The Test Lambda function should not be deployed. Just the layer.
