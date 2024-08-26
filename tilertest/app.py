@@ -8,7 +8,6 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Metrics
-from aws_lambda_powertools.metrics import MetricUnit
 
 IN_TSDM_FILE = '/vsis3/cibo-test-oregon/cibo_tilerlayer/median_tsdm_aus_20240129_wm_r80m_v2.vrt'
 IN_FC_FILE = '/vsis3/cibo-test-oregon/cibo_tilerlayer/median_fc_aus_20240129_wm_r80m_v1.vrt'
@@ -32,9 +31,10 @@ TSDM_POINTS = [(0, [255, 255, 255, 255]), (1, [215, 25, 28, 255]),
     (3000, [8, 96, 9, 255]), (4000, [14, 39, 17, 255]), 
     (5000, [255, 0, 255, 255]), (6000, [148, 33, 225, 255])]
 
-app = APIGatewayRestResolver()
-logger = Logger()
-metrics = Metrics(namespace="Powertools")
+# If this assert fails then there is something wrong with 
+# your SAM install. Try installing locally (in your home dir).
+LD_PATH = os.getenv('LD_LIBRARY_PATH')
+assert LD_PATH.startswith('/opt/python/lib')
 
 # As a shortcut you can run:
 # layers/gdal/cibotiling/cibotiling.py tilertest/
@@ -43,8 +43,13 @@ metrics = Metrics(namespace="Powertools")
 # This will mean that you don't need to rebuild the layer
 # each time there is a change.
 # Remember to revert (and delete tilertest/cibotiling.py before deploying!
+# import cibotiling
 from cibotiling import cibotiling
-#import cibotiling
+
+app = APIGatewayRestResolver()
+logger = Logger()
+metrics = Metrics(namespace="Powertools")
+
 
 @app.get('/test_colormap_interval', cors=True)
 def doColorMapIntervalTest():
@@ -88,7 +93,7 @@ def doRescaleTest():
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 # Adding tracer
 # See: https://awslabs.github.io/aws-lambda-powertools-python/latest/core/tracer/
-#@tracer.capture_lambda_handler
+# @tracer.capture_lambda_handler
 # ensures metrics are flushed upon request completion/failure and capturing ColdStart metric
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:

@@ -43,8 +43,17 @@ def openPNGAndGetMean(data):
     img = Image.open(io.BytesIO(data))
     arr = numpy.array(img)
     assert len(arr.shape) == 3
-    for n in range(arr.shape[0]):
-        print(arr[n].min(), arr[n].max())
+    # Not sure why the indexing is qround the other way
+    assert arr.shape[-1] == 4
+    minMaxs = set()
+    for n in range(arr.shape[-1]):
+        a = arr[:, :, n]
+        minMaxs.add((a.min(), a.max()))
+
+    if len(minMaxs) == 1:
+        # sometimes PIL coverts 2 band images (val, alpha)
+        # to 4 band ones by repeating the first band.
+        raise SystemExit('All bands are the same value')
 
 
 def createTests():
@@ -70,22 +79,23 @@ def main():
 
     if cmdargs.mode == 'test':
         # deploy locally then run tests
-        cmd = ['sam', 'local', 'start-api', '--config-env', cmdargs.environment]
-        proc = subprocess.Popen(cmd)
-        time.sleep(cmdargs.wait)
-        if proc.poll() is not None:
-            raise SystemExit("Child exited")
+        try:
+            cmd = ['sam', 'local', 'start-api', '--config-env', cmdargs.environment]
+            proc = subprocess.Popen(cmd)
+            time.sleep(cmdargs.wait)
+            if proc.poll() is not None:
+                raise SystemExit("Child exited")
 
-        tests = createTests()
-        for testName, testEndpoint in tests.items():
-            print(testName)
-            testURL = 'http://127.0.0.1:3000' + testEndpoint
-            r = requests.get(testURL, headers={'Accept': 'image/png'})
-            outdata = r.content
-            openPNGAndGetMean(outdata)
-
-        proc.terminate()
-        proc.wait()
+            tests = createTests()
+            for testName, testEndpoint in tests.items():
+                print(testName)
+                testURL = 'http://127.0.0.1:3000' + testEndpoint
+                r = requests.get(testURL, headers={'Accept': 'image/png'})
+                outdata = r.content
+                openPNGAndGetMean(outdata)
+        finally:
+            proc.terminate()
+            proc.wait()
 
     else:
         cmd = ['sam', 'deploy', '--config-env', cmdargs.environment]
