@@ -47,7 +47,7 @@ build_image = "public.ecr.aws/sam/build-python3.12:latest-arm64"
 use_container = true
 
 [dev.deploy.parameters]
-parameter_overrides = "Environment=\"dev\" HasFunction=\"false\""
+parameter_overrides = "Environment=\"dev\""
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
@@ -58,14 +58,14 @@ image_repositories = []
 tags = ["LambdaDev=1"]
 
 [dev.local_start_api.parameters]
-parameter_overrides = "Environment=\"dev\" HasFunction=\"true\""
+parameter_overrides = "Environment=\"dev\""
 warm_containers = "EAGER"
 debug = true
 log_file = "/dev/stdout"
 region = 'us-west-2'
 
 [dev.local_start_lambda.parameters]
-parameter_overrides = "Environment=\"dev\" HasFunction=\"true\""
+parameter_overrides = "Environment=\"dev\""
 warm_containers = "EAGER"
 debug = true
 log_file = "/dev/stdout"
@@ -83,26 +83,26 @@ use_container = true
 
 
 [prod.deploy.parameters]
-parameter_overrides = "Environment=\"prod\" HasFunction=\"false\""
+parameter_overrides = "Environment=\"prod\""
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
 region = "ap-southeast-2"
-s3_prefix = "cibo-tiler-prod"
+s3_prefix = "cibo-tilerlayer-prod"
 #disable_rollback = true
 image_repositories = []
 tags = ["LambdaProd=1"]
 
 
 [prod.local_start_api.parameters]
-parameter_overrides = "Environment=\"prod\" HasFunction=\"true\""
+parameter_overrides = "Environment=\"prod\""
 warm_containers = "EAGER"
 debug = true
 log_file = "/dev/stdout"
 region = 'us-west-2'
 
 [prod.local_start_lambda.parameters]
-parameter_overrides = "Environment=\"prod\" HasFunction=\"true\""
+parameter_overrides = "Environment=\"prod\""
 warm_containers = "EAGER"
 debug = true
 log_file = "/dev/stdout"
