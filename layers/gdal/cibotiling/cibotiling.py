@@ -225,8 +225,11 @@ def createColorMapFromIntervals(intervals):
     ----------
     intervals : sequence of ((min, max), (r, g, b, a)) tuples.
         This defines the colours for each interval. Is expected
-        to be sorted. Note that undefined results will occurr
+        to be sorted. Note that undefined results will occur
         if there are missing ranges in the intervals.
+        Note that the actual range set for each colour is
+        (min - max-1). So the max for one range should be the
+        min for the next range.
 
     Returns
     -------
