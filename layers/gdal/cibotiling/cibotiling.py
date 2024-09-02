@@ -152,8 +152,9 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
 
         elif colormap is not None:
             # Note: currently can't specify rescaling AND colormap
+            _, maxCol = colormap.shape
             for n in range(4):
-                imgData[dataslice] = colormap[n][data]
+                imgData[dataslice] = colormap[n][data.clip(min=0, max=maxCol)]
                 band = mem.GetRasterBand(n + 1)
                 band.WriteArray(imgData)
             alphaset = True
