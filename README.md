@@ -16,6 +16,13 @@ having a `.bash_profile` file in your home directory will prevent your environme
 
 ## Testing
 
+NOTE: if you get a 'port in use' error when running `test-deploy.py`, run ::
+
+	ps -ef | grep sam
+
+And look for the process that starts with `/usr/bin/python3 /path/to/sam` and
+`kill` it.
+
 Testing and deployment are handled by the `test-deploy.py` script. Note that everything
 has 2 modes - 'dev' and 'prod' - this is controlled by the `--environment` switch.
 
