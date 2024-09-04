@@ -43,7 +43,7 @@ assert LD_PATH.startswith('/opt/python/lib')
 # This will mean that you don't need to rebuild the layer
 # each time there is a change.
 # Remember to revert (and delete tilertest/cibotiling.py before deploying!
-# import cibotiling
+#import cibotiling
 from cibotiling import cibotiling
 
 app = APIGatewayRestResolver()

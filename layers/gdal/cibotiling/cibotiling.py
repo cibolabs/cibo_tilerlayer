@@ -154,7 +154,7 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
             # Note: currently can't specify rescaling AND colormap
             _, maxCol = colormap.shape
             for n in range(4):
-                imgData[dataslice] = colormap[n][data.clip(min=0, max=maxCol)]
+                imgData[dataslice] = colormap[n][data.clip(min=0, max=(maxCol - 1))]
                 band = mem.GetRasterBand(n + 1)
                 band.WriteArray(imgData)
             alphaset = True
@@ -271,10 +271,10 @@ def createColorMapFromPoints(points):
 
     """
     lastValue, _ = points[-1]
-    result = numpy.empty((4, lastValue), dtype=numpy.uint8)
+    result = numpy.empty((4, lastValue + 1), dtype=numpy.uint8)
 
     xobs = numpy.array([val for val, _ in points])
-    xinterp = numpy.linspace(0, lastValue, lastValue)
+    xinterp = numpy.linspace(0, lastValue, lastValue + 1)
     for idx in range(4):
         # TODO: does it make sense to use interpolation for Alpha?
         yobs = [rgba[idx] for _, rgba in points]
