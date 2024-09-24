@@ -53,7 +53,7 @@ def openPNGAndGetMean(data):
     # Not sure why the indexing is qround the other way
     assert arr.shape[-1] == 4
     minMaxs = set()
-    for n in range(arr.shape[-1]):
+    for n in range(min(arr.shape[-1], 3)): # ignore Alpha
         a = arr[:, :, n]
         minMaxs.add((a.min(), a.max(), a.mean()))
 

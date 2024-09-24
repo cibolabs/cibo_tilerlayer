@@ -37,14 +37,14 @@ LD_PATH = os.getenv('LD_LIBRARY_PATH')
 assert LD_PATH.startswith('/opt/python/lib')
 
 # As a shortcut you can run:
-# layers/gdal/cibotiling/cibotiling.py tilertest/
-# and import cibotiling
+# cp layers/gdal/cibotiling/tiling.py tilertest/
+# and import tiling
 # instead of the command below when testing. 
 # This will mean that you don't need to rebuild the layer
 # each time there is a change.
-# Remember to revert (and delete tilertest/cibotiling.py before deploying!
-#import cibotiling
-from cibotiling import cibotiling
+# Remember to revert (and delete tilertest/tiling.py before deploying!
+#import tiling
+from cibotiling import tiling
 
 app = APIGatewayRestResolver()
 logger = Logger()
@@ -56,8 +56,8 @@ def doColorMapIntervalTest():
     """
     Do a simple test of the color map interval stuff
     """
-    colormap = cibotiling.createColorMapFromIntervals(TSDM_INTERVALS)
-    tile = cibotiling.getTile(IN_TSDM_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1], 
+    colormap = tiling.createColorMapFromIntervals(TSDM_INTERVALS)
+    tile = tiling.getTile(IN_TSDM_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1], 
         colormap=colormap)
 
     return Response(body=tile.getvalue(),
@@ -69,8 +69,8 @@ def doColorMapPointTest():
     """
     Do a simple test of the color map interpolation stuff
     """
-    colormap = cibotiling.createColorMapFromPoints(TSDM_POINTS)
-    tile = cibotiling.getTile(IN_TSDM_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1], 
+    colormap = tiling.createColorMapFromPoints(TSDM_POINTS)
+    tile = tiling.getTile(IN_TSDM_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1], 
         colormap=colormap)
 
     return Response(body=tile.getvalue(),
@@ -82,7 +82,7 @@ def doRescaleTest():
     """
     Rescale the FC (3 bands, all 100-200).
     """
-    tile = cibotiling.getTile(IN_FC_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1, 2, 3],
+    tile = tiling.getTile(IN_FC_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1, 2, 3],
         rescaling=[(100, 200), (100, 200), (100, 200)])
 
     return Response(body=tile.getvalue(),
