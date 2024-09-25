@@ -113,12 +113,16 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         tileSize, tileSize, tlx, tly, brx, bry, bands,
         resampling)
 
+    nodataForBands = [metadata.allIgnore[n - 1] for n in bands]
+    maxOutVal = numpy.iinfo(outTileType).max
+
     # output MEM dataset to write into
     gdalType = gdal_array.NumericTypeCodeToGDALTypeCode(outTileType)
     mem = gdal.GetDriverByName('MEM').Create('', tileSize, 
         tileSize, numOutBands, gdalType)
 
     alphaset = False
+    nodataMask = None  # used (if set) when alphaset == False
     if data is None:
         # no data available for this area - return all zeros
         for n in range(4):
@@ -137,16 +141,29 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
                     databand = data
                     if len(bands) > 1:
                         databand = data[n]
-                    imgData[dataslice] = (databand - minVal).clip(min=0) * (255 / (maxVal - minVal))
+                    imgData[dataslice] = (databand - minVal).clip(min=0) * (maxOutVal / (maxVal - minVal))
                     band = mem.GetRasterBand(n + 1)
                     band.WriteArray(imgData)
+                    if nodataForBands[n] is not None:
+                        mask = databand == nodataForBands[n]
+                        if nodataMask is None:
+                            nodataMask = mask
+                        else:
+                            nodataMask |= mask
+
             else:
                 if len(rescaling) != len(bands):
                     raise ValueError("length of rescaling doesn't math number of bands")
                 for n, (minVal, maxVal) in enumerate(rescaling):
-                    imgData[dataslice] = (data[n] - minVal).clip(min=0) * (255 / (maxVal - minVal))
+                    imgData[dataslice] = (data[n] - minVal).clip(min=0) * (maxOutVal / (maxVal - minVal))
                     band = mem.GetRasterBand(n + 1)
                     band.WriteArray(imgData)
+                    if nodataForBands[n] is not None:
+                        mask = data[n] == nodataForBands[n]
+                        if nodataMask is None:
+                            nodataMask = mask
+                        else:
+                            nodataMask |= mask
 
             alphaset = len(bands) >= 4
 
@@ -169,14 +186,22 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
                 imgData[dataslice] = databand
                 band = mem.GetRasterBand(n + 1)
                 band.WriteArray(imgData)
+                if nodataForBands[n] is not None:
+                    mask = databand == nodataForBands[n]
+                    if nodataMask is None:
+                        nodataMask = mask
+                    else:
+                        nodataMask |= mask
 
             alphaset = len(bands) >= 4
 
     if not alphaset:
-        # return alpha=255 - should probably do something better
-        # TODO: check nodata values(s)?
         band = mem.GetRasterBand(4)
-        band.Fill(255)
+        if nodataMask is not None:
+            band.WriteArray(numpy.where(nodataMask, 
+                outTileType(0), outTileType(maxOutVal)))
+        else:
+            band.Fill(maxOutVal)
 
     result = createBytesIOFromMEM(mem, fmt)
     return result

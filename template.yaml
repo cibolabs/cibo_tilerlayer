@@ -38,7 +38,7 @@ Resources:
     Type: AWS::Serverless::Api
     DependsOn: TestFunction
     Properties:
-      StageName: dev
+      StageName: !Ref Environment
       BinaryMediaTypes:
         - 'image~1png'
 
@@ -54,7 +54,7 @@ Resources:
           Permissions:
             - Read
     Properties:
-      FunctionName: TestCiboTiler
+      FunctionName: !Sub 'TestCiboTiler${Environment}'
       Handler: app.lambda_handler
       CodeUri: tilertest
       Description: Tester for CiboTilerLayer
