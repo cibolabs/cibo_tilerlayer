@@ -87,7 +87,7 @@ parameter_overrides = "Environment=\"prod\""
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
-region = "ap-southeast-2"
+region = "us-west-2"
 s3_prefix = "cibo-tilerlayer-prod"
 #disable_rollback = true
 image_repositories = []

@@ -131,6 +131,7 @@ def main():
         if not cmdargs.skipdeploy:
             cmd = ['sam', 'deploy', '--config-env', cmdargs.environment]
             subprocess.check_call(cmd)
+            time.sleep(30)
 
         stackName = 'cibo-tilerlayer-' + cmdargs.environment
         stackOutputs = getStackOutputs(stackName, cmdargs)
