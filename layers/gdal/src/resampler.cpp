@@ -70,7 +70,7 @@ static PyObject *resampler_bilinear(PyObject *self, PyObject *args)
     double dIgnore;
     int nWidth, nHeight;
     
-    if( !PyArg_ParseTuple(args, "O!oii:reshape", &PyArray_Type, &pInput, 
+    if( !PyArg_ParseTuple(args, "O!Oii:bilinear", &PyArray_Type, &pInput, 
             &pIgnore, &nWidth, &nHeight))
         return NULL;
 
