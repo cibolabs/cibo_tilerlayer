@@ -37,14 +37,14 @@ LD_PATH = os.getenv('LD_LIBRARY_PATH')
 assert LD_PATH.startswith('/opt/python/lib')
 
 # As a shortcut you can run:
-# cp layers/gdal/cibotiling/tiling.py tilertest/
+# cp layers/gdal/cibotiler/tiling.py tilertest/
 # and import tiling
 # instead of the command below when testing. 
 # This will mean that you don't need to rebuild the layer
 # each time there is a change.
 # Remember to revert (and delete tilertest/tiling.py before deploying!
 #import tiling
-from cibotiling import tiling
+from cibotiler import tiling
 
 app = APIGatewayRestResolver()
 logger = Logger()
