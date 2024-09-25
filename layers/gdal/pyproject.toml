@@ -1,7 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cibotiling"
 version = "0.1"
+authors = [
+    {name = "Sam Gillingham", email = "sgillingham@cibolabs.com"}
+]
+
+
+[tool.setuptools.packages.find]
+namespaces = false      # Excludes subdirectories with no __init__.py
