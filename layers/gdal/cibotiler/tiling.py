@@ -790,7 +790,7 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
                     ignore = metadata.allIgnore[bandnum - 1]
                     data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                                 dspLeftExtra, dspTopExtra, dspRightExtra,
-                                dspBottomExtra)
+                                dspBottomExtra, ignore)
 
                 datalist.append(data)
 
