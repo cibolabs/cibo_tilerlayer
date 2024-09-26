@@ -136,6 +136,8 @@ def main():
                 outdata = r.content
                 ok = False
                 ok = openPNGAndGetMean(outdata)
+                if ok and cmdargs.save:
+                    saveImage(outdata, testName)
         finally:
             proc.terminate()
             proc.wait()

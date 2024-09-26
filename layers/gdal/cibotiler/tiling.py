@@ -741,13 +741,13 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
             (dspRastAbsRight, dspRastAbsBottom) = pixel2display(
                 numpy.ceil(pixRight), numpy.ceil(pixBottom), origPixLeft, 
                 origPixTop, imgPixPerWinPix)
-            dspLeftExtra = ((dspRastLeft - dspRastAbsLeft) /
+            dspLeftExtra = int((dspRastLeft - dspRastAbsLeft) /
                 fullrespixperovpix)
-            dspTopExtra = ((dspRastTop - dspRastAbsTop) /
+            dspTopExtra = int((dspRastTop - dspRastAbsTop) /
                 fullrespixperovpix)
-            dspRightExtra = ((dspRastAbsRight - dspRastRight) /
+            dspRightExtra = int((dspRastAbsRight - dspRastRight) /
                 fullrespixperovpix)
-            dspBottomExtra = ((dspRastAbsBottom - dspRastBottom) /
+            dspBottomExtra = int((dspRastAbsBottom - dspRastBottom) /
                 fullrespixperovpix)
             # be aware rounding errors
             dspRightExtra = max(dspRightExtra, 0)

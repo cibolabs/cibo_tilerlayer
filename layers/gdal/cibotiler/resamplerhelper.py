@@ -23,7 +23,7 @@ def replicateArray(arr, outsize, dspLeftExtra, dspTopExtra, dspRightExtra,
     Parameters
     ----------
     arr : numpy.ndarray
-        2 dimenensional input data
+        2 dimensional input data
     outsize : tuple of int
         The output size (xsize, ysize)
     dspLeftExtra : int
@@ -86,7 +86,7 @@ def bilinearResample(arr, outsize, dspLeftExtra, dspTopExtra,
     Parameters
     ----------
     arr : numpy.ndarray
-        2 dimenensional input data
+        2 dimensional input data
     outsize : tuple of int
         The output size (xsize, ysize)
     dspLeftExtra : int
