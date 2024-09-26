@@ -768,9 +768,10 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
             else:
                 dataTmp = band.ReadAsArray(ovleft, ovtop, 
                         ovxsize, ovysize)
+                ignore = metadata.allIgnore[bands[0] - 1]
                 data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                     dspLeftExtra, dspTopExtra, dspRightExtra,
-                         dspBottomExtra)
+                         dspBottomExtra, ignore)
 
         else:
             datalist = []
@@ -786,6 +787,7 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
                 else:
                     dataTmp = band.ReadAsArray(ovleft, ovtop, 
                             ovxsize, ovysize)
+                    ignore = metadata.allIgnore[bandnum - 1]
                     data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                                 dspLeftExtra, dspTopExtra, dspRightExtra,
                                 dspBottomExtra)
