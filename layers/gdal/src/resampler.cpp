@@ -63,6 +63,79 @@ void doBilinearNoIgnore(PyArrayObject *pInput, PyArrayObject *pOutput)
     }    
 }
 
+template <class T>
+void doBilinearHaveIgnore(PyArrayObject *pInput, PyArrayObject *pOutput, double dIgnore)
+{
+    npy_intp nInYSize = PyArray_DIM(pInput, 0);
+    npy_intp nInXSize = PyArray_DIM(pInput, 1);
+    npy_intp nOutYSize = PyArray_DIM(pOutput, 0);
+    npy_intp nOutXSize = PyArray_DIM(pOutput, 1);
+    T typeIgnore = dIgnore;
+    
+    float x_ratio, y_ratio;
+
+    if (nOutXSize > 1) {
+        x_ratio = ((float)nInXSize - 1.0) / ((float)nOutXSize - 1.0);
+    } else {
+        x_ratio = 0;
+    }
+
+    if (nOutYSize > 1) {
+        y_ratio = ((float)nInYSize - 1.0) / ((float)nOutYSize - 1.0);
+    } else {
+        y_ratio = 0;
+    }
+
+    for (int i = 0; i < nOutYSize; i++) 
+    {
+        for (int j = 0; j < nOutXSize; j++) 
+        {
+            float x_l = std::floor(x_ratio * (float)j);
+            float y_l = std::floor(y_ratio * (float)i);
+            float x_h = std::ceil(x_ratio * (float)j);
+            float y_h = std::ceil(y_ratio * (float)i);
+
+            float x_weight = (x_ratio * (float)j) - x_l;
+            float y_weight = (y_ratio * (float)i) - y_l;
+
+            // my approach to ignore values is to just fail if any of the 
+            // neighbours is the ignore value. Not sure if something better could be done...
+            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_l);
+            if( a == typeIgnore )
+            {
+                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
+                continue;
+            } 
+            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_h); 
+            if( b == typeIgnore )
+            {
+                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
+                continue;
+            } 
+            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_l);
+            if( c == typeIgnore )
+            {
+                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
+                continue;
+            } 
+            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_h);
+            if( d == typeIgnore )
+            {
+                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
+                continue;
+            } 
+
+            T pixel = a * (1.0 - x_weight) * (1.0 - y_weight) +
+                          b * x_weight * (1.0 - y_weight) +
+                          c * y_weight * (1.0 - x_weight) +
+                          d * x_weight * y_weight;
+
+            *(T*)PyArray_GETPTR2(pOutput, i, j) = pixel;
+        }
+    }    
+}
+
+
 static PyObject *resampler_bilinear(PyObject *self, PyObject *args)
 {
     PyArrayObject *pInput;
@@ -85,45 +158,95 @@ static PyObject *resampler_bilinear(PyObject *self, PyObject *args)
     npy_intp out_dims[] = {nHeight, nWidth};
     PyArrayObject *pOutput = (PyArrayObject*)PyArray_EMPTY(2, out_dims, arrayType, 0);
     
-    switch(arrayType)
+    if( pIgnore == Py_None )
     {
-        case NPY_INT8:
-            doBilinearNoIgnore <npy_int8> (pInput, pOutput);
-            break;
-        case NPY_UINT8:
-            doBilinearNoIgnore <npy_uint8> (pInput, pOutput);
-            break;
-        case NPY_INT16:
-            doBilinearNoIgnore <npy_int16> (pInput, pOutput);
-            break;
-        case NPY_UINT16:
-            doBilinearNoIgnore <npy_uint16> (pInput, pOutput);
-            break;
-        case NPY_INT32:
-            doBilinearNoIgnore <npy_int32> (pInput, pOutput);
-            break;
-        case NPY_UINT32:
-            doBilinearNoIgnore <npy_uint32> (pInput, pOutput);
-            break;
-        case NPY_INT64:
-            doBilinearNoIgnore <npy_int64> (pInput, pOutput);
-            break;
-        case NPY_UINT64:
-            doBilinearNoIgnore <npy_uint64> (pInput, pOutput);
-            break;
-        case NPY_FLOAT16:
-            doBilinearNoIgnore <npy_float16> (pInput, pOutput);
-            break;
-        case NPY_FLOAT32:
-            doBilinearNoIgnore <npy_float32> (pInput, pOutput);
-            break;
-        case NPY_FLOAT64:
-            doBilinearNoIgnore <npy_float64> (pInput, pOutput);
-            break;
-        default:
-            PyErr_SetString(GETSTATE(self)->error, "Unsupported data type");
-            Py_DECREF(pOutput);
-            return NULL;
+        // no ignore - use optimised version
+        switch(arrayType)
+        {
+            case NPY_INT8:
+                doBilinearNoIgnore <npy_int8> (pInput, pOutput);
+                break;
+            case NPY_UINT8:
+                doBilinearNoIgnore <npy_uint8> (pInput, pOutput);
+                break;
+            case NPY_INT16:
+                doBilinearNoIgnore <npy_int16> (pInput, pOutput);
+                break;
+            case NPY_UINT16:
+                doBilinearNoIgnore <npy_uint16> (pInput, pOutput);
+                break;
+            case NPY_INT32:
+                doBilinearNoIgnore <npy_int32> (pInput, pOutput);
+                break;
+            case NPY_UINT32:
+                doBilinearNoIgnore <npy_uint32> (pInput, pOutput);
+                break;
+            case NPY_INT64:
+                doBilinearNoIgnore <npy_int64> (pInput, pOutput);
+                break;
+            case NPY_UINT64:
+                doBilinearNoIgnore <npy_uint64> (pInput, pOutput);
+                break;
+            case NPY_FLOAT16:
+                doBilinearNoIgnore <npy_float16> (pInput, pOutput);
+                break;
+            case NPY_FLOAT32:
+                doBilinearNoIgnore <npy_float32> (pInput, pOutput);
+                break;
+            case NPY_FLOAT64:
+                doBilinearNoIgnore <npy_float64> (pInput, pOutput);
+                break;
+            default:
+                PyErr_SetString(GETSTATE(self)->error, "Unsupported data type");
+                Py_DECREF(pOutput);
+                return NULL;
+        }
+    }
+    else
+    {
+        // we have an ignore - use slower version
+        dIgnore = PyFloat_AsDouble(pIgnore);
+        // TODO: PyErr_Occurred
+        switch(arrayType)
+        {
+            case NPY_INT8:
+                doBilinearHaveIgnore <npy_int8> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_UINT8:
+                doBilinearHaveIgnore <npy_uint8> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_INT16:
+                doBilinearHaveIgnore <npy_int16> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_UINT16:
+                doBilinearHaveIgnore <npy_uint16> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_INT32:
+                doBilinearHaveIgnore <npy_int32> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_UINT32:
+                doBilinearHaveIgnore <npy_uint32> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_INT64:
+                doBilinearHaveIgnore <npy_int64> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_UINT64:
+                doBilinearHaveIgnore <npy_uint64> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_FLOAT16:
+                doBilinearHaveIgnore <npy_float16> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_FLOAT32:
+                doBilinearHaveIgnore <npy_float32> (pInput, pOutput, dIgnore);
+                break;
+            case NPY_FLOAT64:
+                doBilinearHaveIgnore <npy_float64> (pInput, pOutput, dIgnore);
+                break;
+            default:
+                PyErr_SetString(GETSTATE(self)->error, "Unsupported data type");
+                Py_DECREF(pOutput);
+                return NULL;
+        }
     }
 
     return (PyObject*)pOutput;     
