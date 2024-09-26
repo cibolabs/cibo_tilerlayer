@@ -18,7 +18,7 @@ import numpy
 from osgeo import gdal
 from osgeo import gdal_array
 
-from . import resamplehelper
+from . import resamplerhelper
 
 gdal.UseExceptions()
 
@@ -669,9 +669,9 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
 
     """
     
-    if resampling not in resamplehelper.RESAMPLE_METHODS:
+    if resampling not in resamplerhelper.RESAMPLE_METHODS:
         raise ValueError('Unknown resample method {}'.format(resampling))
-    resampleMethod = resamplehelper.RESAMPLE_METHODS[resampling]
+    resampleMethod = resamplerhelper.RESAMPLE_METHODS[resampling]
 
     # work out number of pixels
     imgPix_x = (brx - tlx) / metadata.transform[1]
