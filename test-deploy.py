@@ -14,7 +14,7 @@ from PIL import Image
 import numpy
 import boto3
 
-DFLT_STARTWAIT = 10 # seconds
+DFLT_STARTWAIT = 10  # seconds
 DFLT_AWSREGION = 'us-west-2'
 
 
@@ -35,7 +35,8 @@ def getCmdArgs():
         help="don't deploy, just test")
     p.add_argument('--awsregion', default=DFLT_AWSREGION,
         help="AWS Region to use. (default=%(default)s)")
-
+    p.add_argument('--save', default=False, action="store_true",
+        help="save output of tests as images")
 
     cmdargs = p.parse_args()
     return cmdargs
@@ -53,7 +54,7 @@ def openPNGAndGetMean(data):
     # Not sure why the indexing is qround the other way
     assert arr.shape[-1] == 4
     minMaxs = set()
-    for n in range(min(arr.shape[-1], 3)): # ignore Alpha
+    for n in range(min(arr.shape[-1], 3)):  # ignore Alpha
         a = arr[:, :, n]
         minMaxs.add((a.min(), a.max(), a.mean()))
 
@@ -64,6 +65,16 @@ def openPNGAndGetMean(data):
         return False
 
     return True
+    
+
+def saveImage(data, testName):
+    """
+    Save image as a .png file
+    """
+    data = io.BytesIO(data)
+    fname = testName + ".png"
+    with open(fname, "wb") as f:
+        f.write(data.getbuffer())
 
 
 def createTests():
@@ -74,6 +85,8 @@ def createTests():
     tests['tsdm_interval'] = '/test_colormap_interval'
     tests['tsdm_point'] = '/test_colormap_point'
     tests['test_rescale'] = '/test_rescale'
+    tests['test_rescale_nn'] = '/test_rescale_nn'
+    tests['test_rescale_bilinear'] = '/test_rescale_bilinear'
     return tests
 
 
@@ -123,6 +136,8 @@ def main():
                 outdata = r.content
                 ok = False
                 ok = openPNGAndGetMean(outdata)
+                if ok and cmdargs.save:
+                    saveImage(outdata, testName)
         finally:
             proc.terminate()
             proc.wait()
@@ -147,8 +162,11 @@ def main():
             ok = openPNGAndGetMean(outdata)
             if not ok:
                 break
+            if cmdargs.save:
+                saveImage(outdata, testName)
 
     print('result', ok)
+
 
 if __name__ == '__main__':
     main()

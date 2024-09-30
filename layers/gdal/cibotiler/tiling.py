@@ -18,6 +18,8 @@ import numpy
 from osgeo import gdal
 from osgeo import gdal_array
 
+from . import resamplerhelper
+
 gdal.UseExceptions()
 
 
@@ -66,7 +68,7 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         to be applied to a single band image.
     resampling : str, optional
         Name of resampling method to be used when zoomed in more than the 
-        image supported. Currently only 'near' is supported.
+        image supported. Currently only 'near' and 'bilinear' is supported.
     fmt : str, optional
         Name of GDAL driver that creates the image format that needs to be
         returned. Defaults to 'PNG'
@@ -572,69 +574,6 @@ class Metadata:
         self.tInverse = gdal.InvGeoTransform(self.transform)
 
 
-def replicateArray(arr, outsize, dspLeftExtra, dspTopExtra, dspRightExtra, 
-        dspBottomExtra):
-    """
-    Replicate the data in the given 2-d array so that it increases
-    in size to be (ysize, xsize). 
-    
-    Replicates each pixel in both directions. 
-    
-    dspLeftExtra, dspTopExtra are the number of pixels to be shaved off the
-    top and left. dspRightExtra, dspBottomExtra are the number of pixels
-    to be shaved off the bottom and right of the result. This allows us
-    to display fractional pixels.
-
-    Parameters
-    ----------
-    arr : numpy.ndarray
-        2 dimenensional input data
-    outsize : tuple of int
-        The output size (xsize, ysize)
-    dspLeftExtra : int
-        number of pixels to be shaved off the left
-    dspTopExtra : int
-        number of pixels to be shaved off the top
-    dspRightExtra : int
-        number of pixels to be shaved off the right
-    dspBottomExtra : int
-        number of pixels to be shaved off the bottom
-
-    Returns
-    -------
-    numpy.ndarray
-
-    """
-    (ysize, xsize) = outsize
-    (nrows, ncols) = arr.shape
-    nRptsX = float(xsize + dspLeftExtra + dspRightExtra) / float(ncols)
-    nRptsY = float(ysize + dspTopExtra + dspBottomExtra) / float(nrows)
-
-    rowCount = int(numpy.ceil(nrows * nRptsY))
-    colCount = int(numpy.ceil(ncols * nRptsX))
-    
-    # create the lookup table (up to nrows/ncols-1)
-    # using the complex number stuff in numpy.mgrid
-    # doesn't work too well since you end up with unevenly
-    # spaced divisions...
-    row, col = numpy.mgrid[dspTopExtra:rowCount - dspBottomExtra, 
-        dspLeftExtra:colCount - dspRightExtra]
-    # try to be a little frugal with memory
-    numpy.multiply(row, nrows / float(rowCount), out=row, casting='unsafe')
-    numpy.multiply(col, ncols / float(colCount), out=col, casting='unsafe')
-    # need to index with ints
-    row = row.astype(numpy.int32)
-    col = col.astype(numpy.int32)
-
-    # do the lookup
-    outarr = arr[row, col]
-
-    # chop out the extra pixels (if any)
-    outarr = outarr[0:ysize, 0:xsize]
-
-    return outarr
-
-
 def pixel2displayF(col, row, origCol, origRow, imgPixPerWinPix):
     """
     From tuiview - convert pixel coordinates to display as float
@@ -729,13 +668,10 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
         requested bounds is within the image.
 
     """
-    resampleMethod = None
-    if resampling == 'near':
-        resampleMethod = replicateArray
-    else:
-        # See https://chao-ji.github.io/jekyll/update/2018/07/19/BilinearResize.html
-        # for bilinear alternative
+    
+    if resampling not in resamplerhelper.RESAMPLE_METHODS:
         raise ValueError('Unknown resample method {}'.format(resampling))
+    resampleMethod = resamplerhelper.RESAMPLE_METHODS[resampling]
 
     # work out number of pixels
     imgPix_x = (brx - tlx) / metadata.transform[1]
@@ -805,13 +741,13 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
             (dspRastAbsRight, dspRastAbsBottom) = pixel2display(
                 numpy.ceil(pixRight), numpy.ceil(pixBottom), origPixLeft, 
                 origPixTop, imgPixPerWinPix)
-            dspLeftExtra = ((dspRastLeft - dspRastAbsLeft) /
+            dspLeftExtra = int((dspRastLeft - dspRastAbsLeft) /
                 fullrespixperovpix)
-            dspTopExtra = ((dspRastTop - dspRastAbsTop) /
+            dspTopExtra = int((dspRastTop - dspRastAbsTop) /
                 fullrespixperovpix)
-            dspRightExtra = ((dspRastAbsRight - dspRastRight) /
+            dspRightExtra = int((dspRastAbsRight - dspRastRight) /
                 fullrespixperovpix)
-            dspBottomExtra = ((dspRastAbsBottom - dspRastBottom) /
+            dspBottomExtra = int((dspRastAbsBottom - dspRastBottom) /
                 fullrespixperovpix)
             # be aware rounding errors
             dspRightExtra = max(dspRightExtra, 0)
@@ -832,9 +768,10 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
             else:
                 dataTmp = band.ReadAsArray(ovleft, ovtop, 
                         ovxsize, ovysize)
+                ignore = metadata.allIgnore[bands[0] - 1]
                 data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                     dspLeftExtra, dspTopExtra, dspRightExtra,
-                         dspBottomExtra)
+                         dspBottomExtra, ignore)
 
         else:
             datalist = []
@@ -850,9 +787,10 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
                 else:
                     dataTmp = band.ReadAsArray(ovleft, ovtop, 
                             ovxsize, ovysize)
+                    ignore = metadata.allIgnore[bandnum - 1]
                     data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
                                 dspLeftExtra, dspTopExtra, dspRightExtra,
-                                dspBottomExtra)
+                                dspBottomExtra, ignore)
 
                 datalist.append(data)
 

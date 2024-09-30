@@ -9,11 +9,26 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Metrics
 
+# As a shortcut you can run:
+# cp layers/gdal/cibotiler/tiling.py tilertest/
+# and import tiling
+# instead of the command below when testing. 
+# This will mean that you don't need to rebuild the layer
+# each time there is a change.
+# Remember to revert (and delete tilertest/tiling.py before deploying!
+# import tiling
+from cibotiler import tiling
+
+
 IN_TSDM_FILE = '/vsis3/cibo-test-oregon/cibo_tilerlayer/median_tsdm_aus_20240129_wm_r80m_v2.vrt'
 IN_FC_FILE = '/vsis3/cibo-test-oregon/cibo_tilerlayer/median_fc_aus_20240129_wm_r80m_v1.vrt'
 TEST_Z = 7
 TEST_X = 115
 TEST_Y = 74
+# More than 1:1
+TEST_ZOOM_Z = 12
+TEST_ZOOM_X = 3787
+TEST_ZOOM_Y = 2373
 
 TSDM_INTERVALS = [((0, 0), [255, 255, 255, 255]), ((1, 1), [215, 25, 28, 255]), 
     ((1, 250), [215, 25, 28, 255]), ((251, 500), [234, 99, 62, 255]), 
@@ -35,16 +50,6 @@ TSDM_POINTS = [(0, [255, 255, 255, 255]), (1, [215, 25, 28, 255]),
 # your SAM install. Try installing locally (in your home dir).
 LD_PATH = os.getenv('LD_LIBRARY_PATH')
 assert LD_PATH.startswith('/opt/python/lib')
-
-# As a shortcut you can run:
-# cp layers/gdal/cibotiling/tiling.py tilertest/
-# and import tiling
-# instead of the command below when testing. 
-# This will mean that you don't need to rebuild the layer
-# each time there is a change.
-# Remember to revert (and delete tilertest/tiling.py before deploying!
-#import tiling
-from cibotiling import tiling
 
 app = APIGatewayRestResolver()
 logger = Logger()
@@ -83,6 +88,32 @@ def doRescaleTest():
     Rescale the FC (3 bands, all 100-200).
     """
     tile = tiling.getTile(IN_FC_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1, 2, 3],
+        rescaling=[(100, 200), (100, 200), (100, 200)])
+
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.get('/test_rescale_nn', cors=True)
+def doRescaleTestNN():
+    """
+    Rescale the FC (3 bands, all 100-200).
+    """
+    tile = tiling.getTile(IN_FC_FILE, TEST_ZOOM_Z, TEST_ZOOM_X, 
+        TEST_ZOOM_Y, bands=[1, 2, 3], resampling='near',
+        rescaling=[(100, 200), (100, 200), (100, 200)])
+
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.get('/test_rescale_bilinear', cors=True)
+def doRescaleTestBilinear():
+    """
+    Rescale the FC (3 bands, all 100-200).
+    """
+    tile = tiling.getTile(IN_FC_FILE, TEST_ZOOM_Z, TEST_ZOOM_X, 
+        TEST_ZOOM_Y, bands=[1, 2, 3], resampling='bilinear',
         rescaling=[(100, 200), (100, 200), (100, 200)])
 
     return Response(body=tile.getvalue(),
