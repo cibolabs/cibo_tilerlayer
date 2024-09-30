@@ -98,39 +98,43 @@ void doBilinearHaveIgnore(PyArrayObject *pInput, PyArrayObject *pOutput, double 
             float x_weight = (x_ratio * (float)j) - x_l;
             float y_weight = (y_ratio * (float)i) - y_l;
 
-            // my approach to ignore values is to just fail if any of the 
-            // neighbours is the ignore value. Not sure if something better could be done...
-            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_l);
-            if( a == typeIgnore )
-            {
-                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
-                continue;
-            } 
-            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_h); 
-            if( b == typeIgnore )
-            {
-                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
-                continue;
-            } 
-            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_l);
-            if( c == typeIgnore )
-            {
-                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
-                continue;
-            } 
-            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_h);
-            if( d == typeIgnore )
-            {
-                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;
-                continue;
-            } 
+            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_l);  
+            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_h);   
+            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_l);  
+            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_h);  
 
-            T pixel = a * (1.0 - x_weight) * (1.0 - y_weight) +
-                          b * x_weight * (1.0 - y_weight) +
-                          c * y_weight * (1.0 - x_weight) +
-                          d * x_weight * y_weight;
+            float totalWeight = 0.0;  
+            float pixelSum = 0.0;  
+            
+            if (a != typeIgnore) 
+            {
+                pixelSum += a * (1.0 - x_weight) * (1.0 - y_weight);  
+                totalWeight += (1.0 - x_weight) * (1.0 - y_weight);  
+            }  
+            if (b != typeIgnore) 
+            {
+                pixelSum += b * x_weight * (1.0 - y_weight);  
+                totalWeight += x_weight * (1.0 - y_weight);  
+            }  
+            if (c != typeIgnore) 
+            {
+                pixelSum += c * y_weight * (1.0 - x_weight);  
+                totalWeight += y_weight * (1.0 - x_weight);  
+            }  
+            if (d != typeIgnore) 
+            {
+                pixelSum += d * x_weight * y_weight;  
+                totalWeight += x_weight * y_weight;  
+            }  
 
-            *(T*)PyArray_GETPTR2(pOutput, i, j) = pixel;
+            if (totalWeight > 0) 
+            {
+                *(T*)PyArray_GETPTR2(pOutput, i, j) = pixelSum / totalWeight;  
+            } 
+            else 
+            {  
+                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;  
+            }  
         }
     }    
 }
