@@ -106,10 +106,16 @@ def bilinearResample(arr, outsize, dspLeftExtra, dspTopExtra,
 
     """    
     (ysize, xsize) = outsize
-    outarr = resampler.bilinear(arr, ignore, xsize, ysize)
     
-    outarr = outarr[dspTopExtra:ysize - dspBottomExtra, 
-        dspLeftExtra:xsize - dspRightExtra]
+    # do the biliear over the full area and chop out the bits we
+    # need. Did start changing the C++ code to only work
+    # over required area, but this got very complex...
+    rowCount = ysize + dspTopExtra + dspBottomExtra
+    colCount = xsize + dspLeftExtra + dspRightExtra
+    outarr = resampler.bilinear(arr, ignore, colCount, rowCount)
+    
+    outarr = outarr[dspTopExtra:rowCount - dspBottomExtra, 
+        dspLeftExtra:colCount - dspRightExtra]
     return outarr
     
 
