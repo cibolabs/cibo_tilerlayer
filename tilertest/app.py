@@ -27,7 +27,7 @@ TEST_X = 115
 TEST_Y = 74
 # More than 1:1
 TEST_ZOOM_Z = 12
-TEST_ZOOM_X = 3787
+TEST_ZOOM_X = 3788  # this tile causes dspLeftExtra=1, so a good test. 3787 has dspLeftExtra=0 so an alternative
 TEST_ZOOM_Y = 2373
 
 TSDM_INTERVALS = [((0, 0), [255, 255, 255, 255]), ((1, 1), [215, 25, 28, 255]), 
