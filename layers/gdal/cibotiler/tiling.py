@@ -138,12 +138,13 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
             if len(rescaling) == 1:
                 # same rescaling to every band
                 minVal, maxVal = rescaling[0]
+                minMaxRange = maxVal - minVal
                 for n in range(len(bands)):
                     # cope with 2d/3d
                     databand = data
                     if len(bands) > 1:
                         databand = data[n]
-                    imgData[dataslice] = (databand - minVal).clip(min=0) * (maxOutVal / (maxVal - minVal))
+                    imgData[dataslice] = (databand - minVal).clip(min=0, max=minMaxRange) * (maxOutVal / minMaxRange)
                     band = mem.GetRasterBand(n + 1)
                     band.WriteArray(imgData)
                     if nodataForBands[n] is not None:
@@ -157,7 +158,8 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
                 if len(rescaling) != len(bands):
                     raise ValueError("length of rescaling doesn't math number of bands")
                 for n, (minVal, maxVal) in enumerate(rescaling):
-                    imgData[dataslice] = (data[n] - minVal).clip(min=0) * (maxOutVal / (maxVal - minVal))
+                    minMaxRange = maxVal - minVal
+                    imgData[dataslice] = (data[n] - minVal).clip(min=0, max=minMaxRange) * (maxOutVal / minMaxRange)
                     band = mem.GetRasterBand(n + 1)
                     band.WriteArray(imgData)
                     if nodataForBands[n] is not None:
