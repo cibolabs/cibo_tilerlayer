@@ -21,46 +21,53 @@ void doBilinearNoIgnore(PyArrayObject *pInput, PyArrayObject *pOutput)
     npy_intp nInXSize = PyArray_DIM(pInput, 1);
     npy_intp nOutYSize = PyArray_DIM(pOutput, 0);
     npy_intp nOutXSize = PyArray_DIM(pOutput, 1);
-    
-    float x_ratio, y_ratio;
 
-    if (nOutXSize > 1) {
-        x_ratio = ((float)nInXSize - 1.0) / ((float)nOutXSize - 1.0);
-    } else {
-        x_ratio = 0;
-    }
+    float rowscale = (float)nInYSize / (float)nOutYSize;
+    float colscale = (float)nInXSize / (float)nOutXSize;
 
-    if (nOutYSize > 1) {
-        y_ratio = ((float)nInYSize - 1.0) / ((float)nOutYSize - 1.0);
-    } else {
-        y_ratio = 0;
-    }
+    // (ri, ci) are row/col in input, (ro, co) are row/col in output.
+    // These are notionally float coordinate systems, where the whole
+    // number values are on the pixel centres.
+    for (int ro = 0; ro < nOutYSize; ro++) {
+        float ri = (ro + 0.5) * rowscale - 0.5;
+        for (int co = 0; co < nOutXSize; co++) {
+            float ci = (co + 0.5) * colscale - 0.5;
 
-    for (int i = 0; i < nOutYSize; i++) 
-    {
-        for (int j = 0; j < nOutXSize; j++) 
-        {
-            float x_l = std::floor(x_ratio * (float)j);
-            float y_l = std::floor(y_ratio * (float)i);
-            float x_h = std::ceil(x_ratio * (float)j);
-            float y_h = std::ceil(y_ratio * (float)i);
+            // The four surrounding input row/col values i.e. lower/upper,
+            // relative to the (ri, ci) coordinate
+            float ri_l = std::floor(ri);
+            float ri_u = std::ceil(ri);
+            float ci_l = std::floor(ci);
+            float ci_u = std::ceil(ci);
 
-            float x_weight = (x_ratio * (float)j) - x_l;
-            float y_weight = (y_ratio * (float)i) - y_l;
+            // Mostly the edge-of-block values will be stripped off with
+            // the margin. Howver, at the edge of the physical file, there is
+            // no margin, so restrict to within the block, just in case.
+            if (ri_l < 0) ri_l = 0;
+            if (ri_u >= nInYSize) ri_u = nInYSize - 1;
+            if (ci_l < 0) ci_l = 0;
+            if (ci_u >= nInXSize) ci_u = nInXSize - 1;
 
-            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_l); 
-            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_h); 
-            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_l);
-            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_h);
+            // The input pixel values at these 4 points
+            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_l, (npy_intp)ci_l);
+            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_l, (npy_intp)ci_u);
+            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_u, (npy_intp)ci_l);
+            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_u, (npy_intp)ci_u);
 
-            T pixel = a * (1.0 - x_weight) * (1.0 - y_weight) +
-                          b * x_weight * (1.0 - y_weight) +
-                          c * y_weight * (1.0 - x_weight) +
-                          d * x_weight * y_weight;
+            // Weights, one each for row and col
+            float c_w = ci - ci_l;
+            float r_w = ri - ri_l;
 
-            *(T*)PyArray_GETPTR2(pOutput, i, j) = pixel;
+            // The weighted average of the four, which is our estimate
+            // for the output pixel at (ri, ci)
+            T pixel = a * (1.0 - c_w) * (1.0 - r_w) +
+                          b * c_w * (1.0 - r_w) +
+                          c * r_w * (1.0 - c_w) +
+                          d * c_w * r_w;
+
+            *(T*)PyArray_GETPTR2(pOutput, (npy_intp)ro, (npy_intp)co) = pixel;
         }
-    }    
+    }
 }
 
 template <class T>
@@ -72,71 +79,79 @@ void doBilinearHaveIgnore(PyArrayObject *pInput, PyArrayObject *pOutput, double 
     npy_intp nOutXSize = PyArray_DIM(pOutput, 1);
     T typeIgnore = dIgnore;
     
-    float x_ratio, y_ratio;
+    float rowscale = (float)nInYSize / (float)nOutYSize;
+    float colscale = (float)nInXSize / (float)nOutXSize;
 
-    if (nOutXSize > 1) {
-        x_ratio = ((float)nInXSize - 1.0) / ((float)nOutXSize - 1.0);
-    } else {
-        x_ratio = 0;
-    }
+    // (ri, ci) are row/col in input, (ro, co) are row/col in output.
+    // These are notionally float coordinate systems, where the whole
+    // number values are on the pixel centres.
+    for (int ro = 0; ro < nOutYSize; ro++) {
+        float ri = (ro + 0.5) * rowscale - 0.5;
+        for (int co = 0; co < nOutXSize; co++) {
+            float ci = (co + 0.5) * colscale - 0.5;
 
-    if (nOutYSize > 1) {
-        y_ratio = ((float)nInYSize - 1.0) / ((float)nOutYSize - 1.0);
-    } else {
-        y_ratio = 0;
-    }
+            // The four surrounding input row/col values i.e. lower/upper,
+            // relative to the (ri, ci) coordinate
+            float ri_l = std::floor(ri);
+            float ri_u = std::ceil(ri);
+            float ci_l = std::floor(ci);
+            float ci_u = std::ceil(ci);
 
-    for (int i = 0; i < nOutYSize; i++) 
-    {
-        for (int j = 0; j < nOutXSize; j++) 
-        {
-            float x_l = std::floor(x_ratio * (float)j);
-            float y_l = std::floor(y_ratio * (float)i);
-            float x_h = std::ceil(x_ratio * (float)j);
-            float y_h = std::ceil(y_ratio * (float)i);
+            // Mostly the edge-of-block values will be stripped off with
+            // the margin. Howver, at the edge of the physical file, there is
+            // no margin, so restrict to within the block, just in case.
+            if (ri_l < 0) ri_l = 0;
+            if (ri_u >= nInYSize) ri_u = nInYSize - 1;
+            if (ci_l < 0) ci_l = 0;
+            if (ci_u >= nInXSize) ci_u = nInXSize - 1;
 
-            float x_weight = (x_ratio * (float)j) - x_l;
-            float y_weight = (y_ratio * (float)i) - y_l;
+            // The input pixel values at these 4 points
+            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_l, (npy_intp)ci_l);
+            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_l, (npy_intp)ci_u);
+            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_u, (npy_intp)ci_l);
+            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)ri_u, (npy_intp)ci_u);
 
-            T a = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_l);  
-            T b = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_l, (npy_intp)x_h);   
-            T c = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_l);  
-            T d = *(T*)PyArray_GETPTR2(pInput, (npy_intp)y_h, (npy_intp)x_h);  
+            // Weights, one each for row and col
+            float c_w = ci - ci_l;
+            float r_w = ri - ri_l;
 
-            float totalWeight = 0.0;  
-            float pixelSum = 0.0;  
-            
-            if (a != typeIgnore) 
+            float totalWeight = 0.0;
+            float pixelSum = 0.0;
+            T pixel;
+
+            if (a != typeIgnore)
             {
-                pixelSum += a * (1.0 - x_weight) * (1.0 - y_weight);  
-                totalWeight += (1.0 - x_weight) * (1.0 - y_weight);  
-            }  
-            if (b != typeIgnore) 
+                pixelSum += a * (1.0 - c_w) * (1.0 - r_w);
+                totalWeight += (1.0 - c_w) * (1.0 - r_w);
+            }
+            if (b != typeIgnore)
             {
-                pixelSum += b * x_weight * (1.0 - y_weight);  
-                totalWeight += x_weight * (1.0 - y_weight);  
-            }  
-            if (c != typeIgnore) 
+                pixelSum += b * c_w * (1.0 - r_w);
+                totalWeight += c_w * (1.0 - r_w);
+            }
+            if (c != typeIgnore)
             {
-                pixelSum += c * y_weight * (1.0 - x_weight);  
-                totalWeight += y_weight * (1.0 - x_weight);  
-            }  
-            if (d != typeIgnore) 
+                pixelSum += c * r_w * (1.0 - c_w);
+                totalWeight += r_w * (1.0 - c_w);
+            }
+            if (d != typeIgnore)
             {
-                pixelSum += d * x_weight * y_weight;  
-                totalWeight += x_weight * y_weight;  
-            }  
+                pixelSum += d * c_w * r_w;
+                totalWeight += c_w * r_w;
+            }
 
-            if (totalWeight > 0) 
+            if (totalWeight > 0)
             {
-                *(T*)PyArray_GETPTR2(pOutput, i, j) = pixelSum / totalWeight;  
-            } 
-            else 
-            {  
-                *(T*)PyArray_GETPTR2(pOutput, i, j) = typeIgnore;  
-            }  
+                pixel = pixelSum / totalWeight;
+            }
+            else
+            {
+                pixel = typeIgnore;
+            }
+
+            *(T*)PyArray_GETPTR2(pOutput, (npy_intp)ro, (npy_intp)co) = pixel;
         }
-    }    
+    }
 }
 
 
