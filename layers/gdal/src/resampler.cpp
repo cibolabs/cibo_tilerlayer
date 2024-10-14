@@ -11,9 +11,6 @@ struct ResamplerState
 
 #define GETSTATE(m) ((struct ResamplerState*)PyModule_GetState(m))
 
-// See https://gist.github.com/folkertdev/6b930c7a7856e36dcad0a72a03e66716
-// and https://chao-ji.github.io/jekyll/update/2018/07/19/BilinearResize.html
-
 template <class T>
 void doBilinearNoIgnore(PyArrayObject *pInput, PyArrayObject *pOutput)
 {
