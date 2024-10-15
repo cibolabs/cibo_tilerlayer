@@ -760,46 +760,64 @@ def getRawImageChunk(ds, metadata, xsize, ysize, tlx, tly, brx, bry, bands,
         dataslice = (slice(dspRastTop, dspRastTop + dspRastYSize),
             slice(dspRastLeft, dspRastLeft + dspRastXSize))
 
-        if len(bands) == 1:
-            band = ds.GetRasterBand(bands[0])
+        datalist = []
+        for bandnum in bands:
+            band = ds.GetRasterBand(bandnum)
             if selectedovi.index > 0:
                 band = band.GetOverview(selectedovi.index - 1)
 
             if imgPixPerWinPix >= 1:
                 data = band.ReadAsArray(ovleft, ovtop, 
-                        ovxsize, ovysize,
-                        dspRastXSize, dspRastYSize)
+                    ovxsize, ovysize,
+                    dspRastXSize, dspRastYSize)
             else:
-                dataTmp = band.ReadAsArray(ovleft, ovtop, 
-                        ovxsize, ovysize)
-                ignore = metadata.allIgnore[bands[0] - 1]
-                data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
-                    dspLeftExtra, dspTopExtra, dspRightExtra,
-                         dspBottomExtra, ignore)
+                marg = MarginsForResample(resampling, ovleft, ovtop,
+                    ovxsize, ovysize, band)
+                dataTmp = band.ReadAsArray(
+                    ovleft - marg.left,
+                    ovtop - marg.top,
+                    ovxsize + marg.left + marg.right,
+                    ovysize + marg.top + marg.bottom)
+                ignore = metadata.allIgnore[bandnum - 1]
+                data = resampleMethod(dataTmp,
+                    (dspRastYSize, dspRastXSize),
+                    dspLeftExtra + int(round(marg.left / imgPixPerWinPix)),
+                    dspTopExtra + int(round(marg.top / imgPixPerWinPix)),
+                    dspRightExtra + int(round(marg.right / imgPixPerWinPix)),
+                    dspBottomExtra + int(round(marg.bottom / imgPixPerWinPix)),
+                    ignore)
 
+            datalist.append(data)
+
+        if len(datalist) == 1:
+            # For single band, we return a 2-d array
+            data = datalist[0]
         else:
-            datalist = []
-            for bandnum in bands:
-                band = ds.GetRasterBand(bandnum)
-                if selectedovi.index > 0:
-                    band = band.GetOverview(selectedovi.index - 1)
-
-                if imgPixPerWinPix >= 1:
-                    data = band.ReadAsArray(ovleft, ovtop, 
-                            ovxsize, ovysize,
-                            dspRastXSize, dspRastYSize)
-                else:
-                    dataTmp = band.ReadAsArray(ovleft, ovtop, 
-                            ovxsize, ovysize)
-                    ignore = metadata.allIgnore[bandnum - 1]
-                    data = resampleMethod(dataTmp, (dspRastYSize, dspRastXSize), 
-                                dspLeftExtra, dspTopExtra, dspRightExtra,
-                                dspBottomExtra, ignore)
-
-                datalist.append(data)
-
-            # stack 
+            # A 3-d array of all bands
             data = numpy.array(datalist)
 
     return data, dataslice
 
+
+class MarginsForResample:
+    """
+    handle the margin information.
+    TODO: add this to resamplehelper.py
+    """
+    def __init__(self, resampling, ovleft, ovtop, ovxsize, ovysize, band):
+        if resampling == 'bilinear':
+            # Desired margin
+            margin = 1
+            # For each block edge, the amount of margin actually possible
+            # without going off the edge of the file
+            self.left = min(margin, ovleft)
+            self.right = min(margin, band.XSize - (ovleft + ovxsize))
+            self.top = min(margin, ovtop)
+            self.bottom = min(margin, band.YSize - (ovtop + ovysize))
+        elif resampling == 'near':
+            self.left = 0
+            self.right = 0
+            self.top = 0
+            self.bottom = 0
+        else:
+            raise ValueError("Unknown resampling method '{}'".format(resampling))
