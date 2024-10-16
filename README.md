@@ -1,5 +1,18 @@
 # cibo_tilerlayer
 
+## Current Layer Versions
+
+| Layer Version | ARN | Python Version | Architecture |
+| ------------- | --- | -------------- | ------------ |
+|               |     |                |              |
+
+## Documentation 
+
+Use one of the layers above in your Lambda function. You should now be able to import the 
+`cibotiling` module as documented below.
+
+TODO: Link to documentation.
+
 ## Install
 
 The install under Ubuntu isn't totally straightforward. The install
@@ -69,4 +82,11 @@ You may also wish to set some of the other GDAL options like this::
     GDAL_FORCE_CACHING: "YES"
     GDAL_HTTP_MAX_RETRY: "10"
     GDAL_HTTP_RETRY_DELAY: "1"
+    
+## License
 
+See [LICENSE](https://github.com/cibolabs/cibo_tilerlayer/blob/main/LICENSE)
+
+## Changes
+
+See [CHANGES.md](https://github.com/cibolabs/cibo_tilerlayer/blob/main/CHANGES.md)

@@ -1,9 +1,24 @@
+# This file is part of Cibo Tiler.
+# Copyright (C) 2024 Cibolabs.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   cibo_tilerlayer
 
-  Sample SAM Template for cibo_tilerlayer
+  SAM Template for cibo_tilerlayer
 
 Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
   Function:
@@ -16,6 +31,13 @@ Parameters:
     Type: String
     Default: notset
     Description: (Required) Enter dev, prod.
+  Architecture:
+    Type: String
+    Default: arm64
+    Description: Architecture we are building for
+    AllowedValues:
+      - arm64
+      - x86_64
 
 Resources:
   CiboTilerLayer:
@@ -23,14 +45,15 @@ Resources:
     Properties:
       ContentUri: layers/gdal
       CompatibleArchitectures:
-        - arm64
+        - !Ref Architecture
       CompatibleRuntimes:
         - python3.12
+      LicenseInfo: GPL-3.0-or-later
       # TODO different names for different architectures?
-      LayerName: !Sub 'CiboTilerLayer${Environment}'
+      LayerName: !Sub 'CiboTilerLayer${Architecture}${Environment}'
     Metadata:
       BuildMethod: makefile
-      BuildArchitecture: arm64
+      BuildArchitecture: !Ref Architecture
 
   # Needed even though we just test the function in 'local' mode
   # Otherwise binary png is returned as base64
@@ -59,7 +82,7 @@ Resources:
       CodeUri: tilertest
       Description: Tester for CiboTilerLayer
       Architectures:
-        - arm64
+        - !Ref Architecture
       Events:
         CatchAll:
           Type: Api
