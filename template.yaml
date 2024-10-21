@@ -43,13 +43,12 @@ Resources:
   CiboTilerLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      ContentUri: layers/gdal
+      ContentUri: layers/cibo
       CompatibleArchitectures:
         - !Ref Architecture
       CompatibleRuntimes:
         - python3.12
       LicenseInfo: GPL-3.0-or-later
-      # TODO different names for different architectures?
       LayerName: !Sub 'CiboTilerLayer${Architecture}${Environment}'
     Metadata:
       BuildMethod: makefile

@@ -11,11 +11,20 @@
 Use one of the layers above in your Lambda function. You should now be able to import the 
 `cibotiling` module as documented below.
 
-TODO: Link to documentation.
+If you wish to install the `cibotiling` package in your existing Python environment, run ::
 
-## Install
+    cd layers/cibo
+    pip install .
 
-The install under Ubuntu isn't totally straightforward. The install
+
+For more information on how to use this package, please refer to the [documentation](https://cibotilerlayer.readthedocs.io/).
+
+
+## Building from Source
+
+AWS SAM needs to be installed first. 
+
+The install of SAM under Ubuntu isn't totally straightforward. The install
 instructions are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
 
 However, using their install script and installing into `/usr/local` appears to 
@@ -27,7 +36,7 @@ This will install SAM into your home directory. Note that you will need to log o
 and log back in before this change is reflected in your environment. Note that 
 having a `.bash_profile` file in your home directory will prevent your environment being updated.
 
-## Testing
+### Testing
 
 NOTE: if you get a 'port in use' error when running `test-deploy.py`, run ::
 
@@ -48,12 +57,12 @@ To avoid rebuilding the layer each time you make a change to the `cibotiling.py`
 you can follow the instructions in `tilertest/app.py` to copy it so it is included
 in the test function.
 
-## Deployment
+### Deployment
 
 Use `test-deploy.py -m deploy` to deploy (the hopefully tested) Lambda function. 
 Note that whether the dev or prod mode is used is controlled by the `--environment` switch.
 
-## Using in projects
+### Using in projects
 
 The name of the created layer (after deployment) is placed in the output of the `cibo-tilerlayer-dev`
 or `cibo-tilerlayer-prod` CloudFormation stacks. Use this name in Lambdas that need this
