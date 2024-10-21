@@ -115,7 +115,7 @@ Outputs:
     Description: "Base Cibo Layer ARN"
     Value: !Ref CiboTilerLayer 
     Export:
-      Name: !Sub "CiboTilerLayerARN-${Environment}"
+      Name: !Sub "CiboTilerLayerARN-${Architecture}-${Environment}"
   ApiURL:
     Description: "API Gateway endpoint URL for Tiler Test"
     Value: !Sub "https://${TestAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"

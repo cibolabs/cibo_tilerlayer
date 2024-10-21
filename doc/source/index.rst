@@ -40,21 +40,24 @@ have pre-stretched image here is how you might use this package::
     from cibotiling import tiling
     
     # X, Y, Z obtained from the client somehow, for example as path or query parameters
-    img = tiling.getTile('/path/to/image.tif', X, Y, Z, bands=[1, 2, 3])
+    img = tiling.getTile('/path/to/image.tif', Z, X, Y, bands=[1, 2, 3])
     # return img to the client
     
+
 For a more complex situation where you wish to rescale imagery on the fly (usually between
 0-255) use the `rescaling` parameter::
 
-    img = tiling.getTile('/path/to/image.tif', X, Y, Z, bands=[1, 2, 3],
+    img = tiling.getTile('/path/to/image.tif', Z, X, Y, bands=[1, 2, 3],
         rescaling=[[90, 123], [32, 211], [87, 198]])
         
+
 For applying a colormap to a single band, use the :meth:`cibotiler.tiling.createColorMapFromIntervals` or
 :meth:`cibotiler.tiling.createColorMapFromPoints` functions::
 
     map = tiling.createColorMapFromPoints([(0, [255, 255, 255, 0]), (50, [32, 58, 102, 255]), (80, [10, 67, 21, 255)])
-    img = tiling.getTile('/path/to/image.tif', X, Y, Z, colormap=map)
+    img = tiling.getTile('/path/to/image.tif', Z, X, Y, colormap=map)
     
+
 See `tilertest/app.py` for a working example.
 
 Download

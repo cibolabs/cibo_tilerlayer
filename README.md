@@ -22,6 +22,15 @@ For more information on how to use this package, please refer to the [documentat
 
 ## Building from Source
 
+Building CiboTiler is a little bit more complex than just installing some Python files.
+We need to have GDAL available with the Python bindings, plus all enough of the GDAL 
+dependencies (GEOS, PROJ etc). See [our makefile](https://github.com/cibolabs/cibo_tilerlayer/blob/main/layers/cibo/Makefile)
+for more information.
+
+Currently, we are focused on building for ARM on a AWS Graviton machines. And make layers
+available for this. We will make `x86_64` builds available if there is demand. Do do this yourself
+you will need to pass through the `Architecture` parameter as `x86_64` into `template.yaml`.
+
 AWS SAM needs to be installed first. 
 
 The install of SAM under Ubuntu isn't totally straightforward. The install
@@ -64,8 +73,8 @@ Note that whether the dev or prod mode is used is controlled by the `--environme
 
 ### Using in projects
 
-The name of the created layer (after deployment) is placed in the output of the `cibo-tilerlayer-dev`
-or `cibo-tilerlayer-prod` CloudFormation stacks. Use this name in Lambdas that need this
+The ARN of the created layer (after deployment) is placed in the output of the `CiboTilerLayerARN-arm64-dev`
+or `CiboTilerLayerARN-arm64-prod` CloudFormation stacks. Use this name in Lambdas that need this
 layer. Note that you can't use `Fn::ImportValue` in AWS SAM in local mode and that 
 you probably want to use a fixed version of this layer so you don't suddenly get the 
 latest on redeploy.
