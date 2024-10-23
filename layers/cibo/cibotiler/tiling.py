@@ -541,6 +541,8 @@ class Metadata:
     """
     Class that holds all the 'metadata' about an object (ie size, projection etc)
     and can be passed around without re-requesting the data again.
+    
+    Will raise an error if file not in web mercator (EPSG: 3857)
 
     Parameters
     ----------
@@ -576,6 +578,10 @@ class Metadata:
         self.thematic = band1.GetMetadataItem('LAYER_TYPE') == 'thematic'
 
         self.transform = ds.GetGeoTransform()
+        
+        proj = ds.GetSpatialRef()
+        proj.AutoIdentifyEPSG()
+        assert proj.GetAttrValue('AUTHORITY', 1) == 3857
 
         self.allIgnore = []
         for nband in range(ds.RasterCount):

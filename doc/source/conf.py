@@ -15,11 +15,11 @@ author = 'Sam Gillingham and Neil Flood'
 
 extensions = [
     'sphinx.ext.autodoc', 'numpydoc', 'sphinx.ext.graphviz',
-    'sphinx.ext.autosectionlabel', 'sphinx.ext.intersphinx']
+    'sphinx.ext.autosectionlabel']
 
 templates_path = ['_templates']
 exclude_patterns = []
-autodoc_mock_imports = ['numpy', 'osgeo']
+autodoc_mock_imports = ['numpy', 'osgeo', 'cibotiler.resampler']
 autodoc_member_order = 'bysource'
 # Make sure section targets are unique
 autosectionlabel_prefix_document=True
@@ -45,12 +45,4 @@ html_static_path = []
 numpydoc_show_class_members = False
 
 html_logo = "logo-cibolabs.png"
-
-# -- Options for intersphinx extension ---------------------------------------
-
-intersphinx_mapping = {
-    "numpy": ("https://numpy.org/doc/stable", None),
-    "python": ("https://docs.python.org/3", None),
-    "gdal": ("https://gdal.org/en/latest/api/python_bindings.html", None)
-}
 

@@ -37,7 +37,7 @@ Example
 :meth:`cibotiler.tiling.getTile` is the main interface. For the simplest case when you already 
 have pre-stretched image here is how you might use this package::
 
-    from cibotiling import tiling
+    from cibotiler import tiling
     
     # X, Y, Z obtained from the client somehow, for example as path or query parameters
     img = tiling.getTile('/path/to/image.tif', Z, X, Y, bands=[1, 2, 3])
@@ -54,8 +54,8 @@ For a more complex situation where you wish to rescale imagery on the fly (usual
 For applying a colormap to a single band, use the :meth:`cibotiler.tiling.createColorMapFromIntervals` or
 :meth:`cibotiler.tiling.createColorMapFromPoints` functions::
 
-    map = tiling.createColorMapFromPoints([(0, [255, 255, 255, 0]), (50, [32, 58, 102, 255]), (80, [10, 67, 21, 255)])
-    img = tiling.getTile('/path/to/image.tif', Z, X, Y, colormap=map)
+    cmap = tiling.createColorMapFromPoints([(0, [255, 255, 255, 0]), (50, [32, 58, 102, 255]), (80, [10, 67, 21, 255)])
+    img = tiling.getTile('/path/to/image.tif', Z, X, Y, colormap=cmap)
     
 
 See `tilertest/app.py` for a working example.
@@ -72,3 +72,18 @@ Installation
 ------------
 
 See `README.md <https://github.com/cibolabs/cibo_tilerlayer/blob/main/README.md>`__ for information.
+
+Guides
+=======
+
+.. toctree::
+   :maxdepth: 1
+   
+   api
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
