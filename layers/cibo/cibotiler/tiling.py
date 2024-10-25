@@ -581,7 +581,7 @@ class Metadata:
         
         proj = ds.GetSpatialRef()
         proj.AutoIdentifyEPSG()
-        assert proj.GetAttrValue('AUTHORITY', 1) == 3857
+        assert proj.GetAttrValue('AUTHORITY', 1) == '3857'
 
         self.allIgnore = []
         for nband in range(ds.RasterCount):
