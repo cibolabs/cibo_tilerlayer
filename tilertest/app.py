@@ -29,7 +29,7 @@ from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Metrics
 
 # As a shortcut you can run:
-# cp layers/gdal/cibotiler/tiling.py tilertest/
+# cp layers/cibo/cibotiler/tiling.py tilertest/
 # and import tiling
 # instead of the command below when testing. 
 # This will mean that you don't need to rebuild the layer
@@ -39,31 +39,23 @@ from aws_lambda_powertools import Metrics
 from cibotiler import tiling
 
 
-IN_TSDM_FILE = '/vsis3/cibo-test-oregon/cibo_tilerlayer/median_tsdm_aus_20240129_wm_r80m_v2.vrt'
-IN_FC_FILE = '/vsis3/cibo-test-oregon/cibo_tilerlayer/median_fc_aus_20240129_wm_r80m_v1.vrt'
-TEST_Z = 7
-TEST_X = 115
-TEST_Y = 74
-# More than 1:1
-TEST_ZOOM_Z = 12
-TEST_ZOOM_X = 3788  # this tile causes dspLeftExtra=1, so a good test. 3787 has dspLeftExtra=0 so an alternative
-TEST_ZOOM_Y = 2373
+# Some test colour intervals
+INTERVALS = [((0, 0), [255, 255, 255, 255]), ((1, 1), [215, 25, 28, 255]), 
+    ((1, 25), [215, 25, 28, 255]), ((26, 50), [234, 99, 62, 255]), 
+    ((51, 75), [253, 174, 97, 255]), ((76, 100), [254, 215, 145, 255]), 
+    ((101, 125), [255, 255, 192, 255]), ((126, 500), [211, 236, 149, 255]), 
+    ((501, 750), [166, 217, 106, 255]), ((751, 1000), [54, 162, 40, 255]), 
+    ((1001, 2000), [8, 96, 9, 255]), ((1001, 2000), [14, 39, 17, 255]), 
+    ((2001, 3000), [255, 0, 255, 255]), ((3001, 4000), [148, 33, 225, 255])]
 
-TSDM_INTERVALS = [((0, 0), [255, 255, 255, 255]), ((1, 1), [215, 25, 28, 255]), 
-    ((1, 250), [215, 25, 28, 255]), ((251, 500), [234, 99, 62, 255]), 
-    ((501, 750), [253, 174, 97, 255]), ((751, 1000), [254, 215, 145, 255]), 
-    ((1001, 1250), [255, 255, 192, 255]), ((1251, 1500), [211, 236, 149, 255]), 
-    ((1501, 1750), [166, 217, 106, 255]), ((1751, 2000), [54, 162, 40, 255]), 
-    ((2001, 3000), [8, 96, 9, 255]), ((3001, 4000), [14, 39, 17, 255]), 
-    ((4001, 5000), [255, 0, 255, 255]), ((5001, 6000), [148, 33, 225, 255])]
-
-TSDM_POINTS = [(0, [255, 255, 255, 255]), (1, [215, 25, 28, 255]), 
-    (250, [215, 25, 28, 255]), (500, [234, 99, 62, 255]), 
-    (750, [253, 174, 97, 255]), (1000, [254, 215, 145, 255]), 
-    (1250, [255, 255, 192, 255]), (1500, [211, 236, 149, 255]), 
-    (1750, [166, 217, 106, 255]), (2000, [54, 162, 40, 255]), 
-    (3000, [8, 96, 9, 255]), (4000, [14, 39, 17, 255]), 
-    (5000, [255, 0, 255, 255]), (6000, [148, 33, 225, 255])]
+# test colour points
+POINTS = [(0, [255, 255, 255, 255]), (1, [215, 25, 28, 255]), 
+    (25, [215, 25, 28, 255]), (50, [234, 99, 62, 255]), 
+    (75, [253, 174, 97, 255]), (100, [254, 215, 145, 255]), 
+    (250, [255, 255, 192, 255]), (500, [211, 236, 149, 255]), 
+    (750, [166, 217, 106, 255]), (200, [54, 162, 40, 255]), 
+    (300, [8, 96, 9, 255]), (400, [14, 39, 17, 255]), 
+    (700, [255, 0, 255, 255]), (1000, [148, 33, 225, 255])]
 
 # If this assert fails then there is something wrong with 
 # your SAM install. Try installing locally (in your home dir).
@@ -75,64 +67,91 @@ logger = Logger()
 metrics = Metrics(namespace="Powertools")
 
 
-@app.get('/test_colormap_interval', cors=True)
-def doColorMapIntervalTest():
+def makeVRT(paths):
+    """
+    Functions are passed a list of input tiles, wrap this in a vrt
+    as EPSG:3857.
+    Lambda's share /tmp so vrt creation only happens once per cold start.
+    """
+    outpath = '/tmp/s2.vrt'
+    if not os.path.exist(outpath):
+        vrt_options = gdal.BuildVRTOptions(separate=True, 
+            xRes=80, yRes=80, 
+            targetAlignedPixels=True, 
+            outputSRS='EPSG:3857')
+        vrt = gdal.BuildVRT(outpath, paths, options=vrt_options)
+        vrt.FlushCache()
+    return outpath
+
+
+@app.put('/test_colormap_interval/<z>/<x>/<y>', cors=True)
+def doColorMapIntervalTest(z: int, x: int, y: int):
     """
     Do a simple test of the color map interval stuff
     """
-    colormap = tiling.createColorMapFromIntervals(TSDM_INTERVALS)
-    tile = tiling.getTile(IN_TSDM_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1], 
+    paths = app.current_event.json_body['paths']
+    vrt = makeVRT(paths)
+    colormap = tiling.createColorMapFromIntervals(INTERVALS)
+    tile = tiling.getTile(vrt, z, x, y, bands=[1], 
         colormap=colormap)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_colormap_point', cors=True)
-def doColorMapPointTest():
+@app.get('/test_colormap_point/<z>/<x>/<y>', cors=True)
+def doColorMapPointTest(z: int, x: int, y: int):
     """
     Do a simple test of the color map interpolation stuff
     """
-    colormap = tiling.createColorMapFromPoints(TSDM_POINTS)
-    tile = tiling.getTile(IN_TSDM_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1], 
+    paths = app.current_event.json_body['paths']
+    vrt = makeVRT(paths)
+    colormap = tiling.createColorMapFromPoints(POINTS)
+    tile = tiling.getTile(vrt, z, x, y, bands=[1], 
         colormap=colormap)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_rescale', cors=True)
-def doRescaleTest():
+@app.get('/test_rescale/<z>/<x>/<y>', cors=True)
+def doRescaleTest(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
     """
-    tile = tiling.getTile(IN_FC_FILE, TEST_Z, TEST_X, TEST_Y, bands=[1, 2, 3],
+    paths = app.current_event.json_body['paths']
+    vrt = makeVRT(paths)
+    tile = tiling.getTile(vrt, z, x, y, bands=[1, 2, 3],
         rescaling=[(100, 200), (100, 200), (100, 200)])
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_rescale_nn', cors=True)
-def doRescaleTestNN():
+@app.get('/test_rescale_nn/<z>/<x>/<y>', cors=True)
+def doRescaleTestNN(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
     """
-    tile = tiling.getTile(IN_FC_FILE, TEST_ZOOM_Z, TEST_ZOOM_X, 
-        TEST_ZOOM_Y, bands=[1, 2, 3], resampling='near',
+    paths = app.current_event.json_body['paths']
+    vrt = makeVRT(paths)
+    tile = tiling.getTile(vrt, z, x, y, 
+        bands=[1, 2, 3], resampling='near',
         rescaling=[(100, 200), (100, 200), (100, 200)])
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_rescale_bilinear', cors=True)
-def doRescaleTestBilinear():
+@app.get('/test_rescale_bilinear/<z>/<x>/<y>', cors=True)
+def doRescaleTestBilinear(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
     """
-    tile = tiling.getTile(IN_FC_FILE, TEST_ZOOM_Z, TEST_ZOOM_X, 
-        TEST_ZOOM_Y, bands=[1, 2, 3], resampling='bilinear',
+    paths = app.current_event.json_body['paths']
+    vrt = makeVRT(paths)
+    tile = tiling.getTile(vrt, z, x, y,
+        bands=[1, 2, 3], resampling='bilinear',
         rescaling=[(100, 200), (100, 200), (100, 200)])
 
     return Response(body=tile.getvalue(),

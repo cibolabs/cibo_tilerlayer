@@ -54,7 +54,6 @@ Resources:
       BuildMethod: makefile
       BuildArchitecture: !Ref Architecture
 
-  # Needed even though we just test the function in 'local' mode
   # Otherwise binary png is returned as base64
   TestAPI:
     Type: AWS::Serverless::Api
@@ -72,7 +71,7 @@ Resources:
         Properties:
           Destination:
             Type: AWS::S3::Bucket
-            Arn: arn:aws:s3:::cibo-test-oregon
+            Arn: 'arn:aws:s3:::sentinel-cogs'
           Permissions:
             - Read
     Properties:
@@ -87,7 +86,7 @@ Resources:
           Type: Api
           Properties:
             Path: /{proxy+}
-            Method: GET
+            Method: POST
             RestApiId: !Ref TestAPI
       Layers:
         - !Ref CiboTilerLayer
