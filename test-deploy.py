@@ -26,6 +26,7 @@ Also used to deploy the layer and test function
 import io
 import time
 import argparse
+import datetime
 import subprocess
 from osgeo import osr
 from pystac_client import Client
@@ -146,7 +147,6 @@ def getPathsForTile(z, x, y):
     # do stack query
     daterange = f'{start_s}/{today_s}'
     client = Client.open("https://earth-search.aws.element84.com/v1")
-    client.add_conforms_to('ITEM_SEARCH')
     s2Search = client.search(
         collections=['sentinel-2-l2a'],
         datetime=daterange,
@@ -156,9 +156,9 @@ def getPathsForTile(z, x, y):
     if s2Search.matched() == 0:
         raise SystemExit("no matching images found")
 
-    tiles = s2Search.item_collection()
+    tiles = s2Search.items()
     # look at the first tile
-    tile = tiles[0]
+    tile = next(tiles)
     paths = []
     # grab 3 bands
     for band in ['blue', 'green', 'red']:

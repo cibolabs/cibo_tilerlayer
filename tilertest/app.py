@@ -27,6 +27,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Metrics
+from osgeo import gdal
 
 # As a shortcut you can run:
 # cp layers/cibo/cibotiler/tiling.py tilertest/
@@ -66,6 +67,8 @@ app = APIGatewayRestResolver()
 logger = Logger()
 metrics = Metrics(namespace="Powertools")
 
+gdal.UseExceptions()
+
 
 def makeVRT(paths):
     """
@@ -74,7 +77,7 @@ def makeVRT(paths):
     Lambda's share /tmp so vrt creation only happens once per cold start.
     """
     outpath = '/tmp/s2.vrt'
-    if not os.path.exist(outpath):
+    if not os.path.exists(outpath):
         vrt_options = gdal.BuildVRTOptions(separate=True, 
             xRes=80, yRes=80, 
             targetAlignedPixels=True, 
@@ -84,7 +87,7 @@ def makeVRT(paths):
     return outpath
 
 
-@app.put('/test_colormap_interval/<z>/<x>/<y>', cors=True)
+@app.post('/test_colormap_interval/<z>/<x>/<y>', cors=True)
 def doColorMapIntervalTest(z: int, x: int, y: int):
     """
     Do a simple test of the color map interval stuff
@@ -99,7 +102,7 @@ def doColorMapIntervalTest(z: int, x: int, y: int):
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_colormap_point/<z>/<x>/<y>', cors=True)
+@app.post('/test_colormap_point/<z>/<x>/<y>', cors=True)
 def doColorMapPointTest(z: int, x: int, y: int):
     """
     Do a simple test of the color map interpolation stuff
@@ -114,7 +117,7 @@ def doColorMapPointTest(z: int, x: int, y: int):
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_rescale/<z>/<x>/<y>', cors=True)
+@app.post('/test_rescale/<z>/<x>/<y>', cors=True)
 def doRescaleTest(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
@@ -128,7 +131,7 @@ def doRescaleTest(z: int, x: int, y: int):
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_rescale_nn/<z>/<x>/<y>', cors=True)
+@app.post('/test_rescale_nn/<z>/<x>/<y>', cors=True)
 def doRescaleTestNN(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
@@ -143,7 +146,7 @@ def doRescaleTestNN(z: int, x: int, y: int):
                 status_code=200, headers={'Content-Type': 'image/png'})
 
 
-@app.get('/test_rescale_bilinear/<z>/<x>/<y>', cors=True)
+@app.post('/test_rescale_bilinear/<z>/<x>/<y>', cors=True)
 def doRescaleTestBilinear(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
