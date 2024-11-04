@@ -15,12 +15,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Tester for cibo_tilerlayer
+Tester for cibo_tilerlayer. Makes a STAC query and uses Sentinel-2 data
+for input.
 
-Note: currently can only be run by Cibo since the files it references
-are in that account. But could be adapted to use other test data easily...
 """
 import os
+import shutil
+import tempfile
 
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, Response
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -74,17 +75,32 @@ def makeVRT(paths):
     """
     Functions are passed a list of input tiles, wrap this in a vrt
     as EPSG:3857.
-    Lambda's share /tmp so vrt creation only happens once per cold start.
+    Lambda's share /tmp so we need to be careful - different requests
+    could refer to different files so we create a temp dir to hold
+    the files.
+
+    Returns a tuple with both the vrt to use and the directory to remove
+    when finished.
     """
-    outpath = '/tmp/s2.vrt'
-    if not os.path.exists(outpath):
-        vrt_options = gdal.BuildVRTOptions(separate=True, 
-            xRes=80, yRes=80, 
-            targetAlignedPixels=True, 
-            outputSRS='EPSG:3857')
-        vrt = gdal.BuildVRT(outpath, paths, options=vrt_options)
-        vrt.FlushCache()
-    return outpath
+    tempDir = tempfile.mkdtemp()
+    stackVRT = os.path.join(tempDir, 's2stack.vrt')
+    warpVRT = os.path.join(tempDir, 's2warp.vrt')
+
+    # first stack
+    vrt_options = gdal.BuildVRTOptions(separate=True)
+    vrtStack = gdal.BuildVRT(stackVRT, paths, options=vrt_options)
+    vrtStack.FlushCache()
+    vrtStack = None
+
+    # then warp
+    warp_options = gdal.WarpOptions(
+        xRes=80, yRes=80, 
+        targetAlignedPixels=True, 
+        dstSRS='EPSG:3857')
+    vrt = gdal.Warp(warpVRT, stackVRT, options=warp_options)
+    vrt.FlushCache()
+        
+    return warpVRT, tempDir
 
 
 @app.post('/test_colormap_interval/<z>/<x>/<y>', cors=True)
@@ -93,10 +109,12 @@ def doColorMapIntervalTest(z: int, x: int, y: int):
     Do a simple test of the color map interval stuff
     """
     paths = app.current_event.json_body['paths']
-    vrt = makeVRT(paths)
+    vrt, tempdir = makeVRT(paths)
     colormap = tiling.createColorMapFromIntervals(INTERVALS)
     tile = tiling.getTile(vrt, z, x, y, bands=[1], 
         colormap=colormap)
+
+    shutil.rmtree(tempdir)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
@@ -108,10 +126,12 @@ def doColorMapPointTest(z: int, x: int, y: int):
     Do a simple test of the color map interpolation stuff
     """
     paths = app.current_event.json_body['paths']
-    vrt = makeVRT(paths)
+    vrt, tempdir = makeVRT(paths)
     colormap = tiling.createColorMapFromPoints(POINTS)
     tile = tiling.getTile(vrt, z, x, y, bands=[1], 
         colormap=colormap)
+
+    shutil.rmtree(tempdir)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
@@ -123,9 +143,11 @@ def doRescaleTest(z: int, x: int, y: int):
     Rescale the FC (3 bands, all 100-200).
     """
     paths = app.current_event.json_body['paths']
-    vrt = makeVRT(paths)
+    vrt, tempdir = makeVRT(paths)
     tile = tiling.getTile(vrt, z, x, y, bands=[1, 2, 3],
-        rescaling=[(100, 200), (100, 200), (100, 200)])
+        rescaling=[(0, 1000), (0, 1000), (0, 1000)])
+
+    shutil.rmtree(tempdir)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
@@ -137,10 +159,12 @@ def doRescaleTestNN(z: int, x: int, y: int):
     Rescale the FC (3 bands, all 100-200).
     """
     paths = app.current_event.json_body['paths']
-    vrt = makeVRT(paths)
+    vrt, tempdir = makeVRT(paths)
     tile = tiling.getTile(vrt, z, x, y, 
         bands=[1, 2, 3], resampling='near',
-        rescaling=[(100, 200), (100, 200), (100, 200)])
+        rescaling=[(0, 1000), (0, 1000), (0, 1000)])
+
+    shutil.rmtree(tempdir)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
@@ -152,10 +176,12 @@ def doRescaleTestBilinear(z: int, x: int, y: int):
     Rescale the FC (3 bands, all 100-200).
     """
     paths = app.current_event.json_body['paths']
-    vrt = makeVRT(paths)
+    vrt, tempdir = makeVRT(paths)
     tile = tiling.getTile(vrt, z, x, y,
         bands=[1, 2, 3], resampling='bilinear',
-        rescaling=[(100, 200), (100, 200), (100, 200)])
+        rescaling=[(0, 1000), (0, 1000), (0, 1000)])
+
+    shutil.rmtree(tempdir)
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})

@@ -55,6 +55,9 @@ MERCATOR_TILE_SIZE = 512
 MERCATOR_X_ORIGIN = -20037508.342789244
 MERCATOR_Y_ORIGIN = 20037508.342789244
 
+# back to start of search windor (from today)
+DFLT_DAYS_BEFORE_TODAY = 15
+
 osr.UseExceptions()
 
 
@@ -77,6 +80,8 @@ def getCmdArgs():
         help="AWS Region to use. (default=%(default)s)")
     p.add_argument('--save', default=False, action="store_true",
         help="save output of tests as images")
+    p.add_argument('--daysbeforetoday', default=DFLT_DAYS_BEFORE_TODAY, type=int,
+        help="Number of days before today to start the STAC search window. (default=%(default)s)")
 
     cmdargs = p.parse_args()
     return cmdargs
@@ -114,7 +119,7 @@ def getExtentforWebMTile(z, x, y):
     return (tlx, tly, brx, bry)
     
     
-def getPathsForTile(z, x, y):
+def getPathsForTile(z, x, y, cmdargs):
     """
     For the given tile, do a search on the sentinel STAC.
     Return a list of the red, green and blue GDAL
@@ -140,8 +145,8 @@ def getPathsForTile(z, x, y):
     today = datetime.date.today()
     today_s = today.strftime("%Y-%m-%d")
     
-    # back 15 days
-    start = today - datetime.timedelta(days=15)
+    # back a few days
+    start = today - datetime.timedelta(days=cmdargs.daysbeforetoday)
     start_s = start.strftime("%Y-%m-%d")
     
     # do stack query
@@ -150,7 +155,8 @@ def getPathsForTile(z, x, y):
     s2Search = client.search(
         collections=['sentinel-2-l2a'],
         datetime=daterange,
-        bbox=[tlx, bry, brx, tly]  # xmin, ymin, xmax, ymax
+        bbox=[tlx, bry, brx, tly],  # xmin, ymin, xmax, ymax
+        query={'s2:nodata_pixel_percentage': {'lt': 25}}
     )
     # Show the results of the search
     if s2Search.matched() == 0:
@@ -178,7 +184,7 @@ def openPNGAndGetMean(data):
     img = Image.open(io.BytesIO(data))
     arr = numpy.array(img)
     assert len(arr.shape) == 3
-    # Not sure why the indexing is qround the other way
+    # Not sure why the indexing is around the other way
     assert arr.shape[-1] == 4
     minMaxs = set()
     for n in range(min(arr.shape[-1], 3)):  # ignore Alpha
@@ -204,12 +210,12 @@ def saveImage(data, testName):
         f.write(data.getbuffer())
 
 
-def createTests():
+def createTests(cmdargs):
     """
     Create some tests
     """
-    pathsfortest = getPathsForTile(TEST_Z, TEST_X, TEST_Y)
-    pathsfortest_zoom = getPathsForTile(TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y)
+    pathsfortest = getPathsForTile(TEST_Z, TEST_X, TEST_Y, cmdargs)
+    pathsfortest_zoom = getPathsForTile(TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y, cmdargs)
     
     tests = {}
     tests['test_interval'] = ('/test_colormap_interval/{}/{}/{}'.format(
@@ -263,7 +269,7 @@ def main():
             if proc.poll() is not None:
                 raise SystemExit("Child exited")
 
-            tests = createTests()
+            tests = createTests(cmdargs)
             for testName, (testEndpoint, paths) in tests.items():
                 print(testName)
                 data = {'paths': paths}
@@ -273,8 +279,10 @@ def main():
                 outdata = r.content
                 ok = False
                 ok = openPNGAndGetMean(outdata)
-                if ok and cmdargs.save:
+                if cmdargs.save:
                     saveImage(outdata, testName)
+                if not ok:
+                    break
         finally:
             proc.terminate()
             proc.wait()
@@ -289,7 +297,7 @@ def main():
         stackOutputs = getStackOutputs(stackName, cmdargs)
         url = stackOutputs['ApiURL']
 
-        tests = createTests()
+        tests = createTests(cmdargs)
         for testName, (testEndpoint, paths) in tests.items():
             testURL = url + testEndpoint
             print(testName, testURL)
@@ -299,10 +307,10 @@ def main():
             outdata = r.content
             ok = False
             ok = openPNGAndGetMean(outdata)
-            if not ok:
-                break
             if cmdargs.save:
                 saveImage(outdata, testName)
+            if not ok:
+                break
 
     print('result', ok)
 
