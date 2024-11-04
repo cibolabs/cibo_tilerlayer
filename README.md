@@ -59,6 +59,9 @@ has 2 modes - 'dev' and 'prod' - this is controlled by the `--environment` switc
 
 `test-deploy.py` does a build of the layer first before running anything else. 
 
+Note that the test data uses the Sentinel-2 COGS STAC index to find suitable images
+to test with and this data is within the us-west-2 AWS Region.
+
 For testing, use the `-m test` mode to `test-deploy.py`. This will spin up a local 
 lambda function and run some tests against the layer.
 
