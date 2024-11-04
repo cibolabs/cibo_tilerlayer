@@ -82,6 +82,8 @@ def getCmdArgs():
         help="save output of tests as images")
     p.add_argument('--daysbeforetoday', default=DFLT_DAYS_BEFORE_TODAY, type=int,
         help="Number of days before today to start the STAC search window. (default=%(default)s)")
+    p.add_argument('--layerpublic', default=False, action="store_true",
+        help="Make deployed layer public (only valid with -m deploy)")
 
     cmdargs = p.parse_args()
     return cmdargs
@@ -311,6 +313,22 @@ def main():
                 saveImage(outdata, testName)
             if not ok:
                 break
+
+        if cmdargs.layerpublic:
+            arn = stackOutputs['LayerARN']
+            components = arn.split(':')
+            layer_version = int(components[-1])
+            layer_name = components[-2]
+
+            lambda_client = boto3.client("lambda", region_name=cmdargs.awsregion)
+            lambda_client.add_layer_version_permission(
+                   LayerName=layer_name,
+                    VersionNumber=layer_version,
+                    StatementId="make_public",
+                    Action="lambda:GetLayerVersion",
+                    Principal="*",
+             )
+            
 
     print('result', ok)
 
