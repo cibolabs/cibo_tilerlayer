@@ -322,14 +322,13 @@ def main():
 
             lambda_client = boto3.client("lambda", region_name=cmdargs.awsregion)
             lambda_client.add_layer_version_permission(
-                   LayerName=layer_name,
-                    VersionNumber=layer_version,
-                    StatementId="make_public",
-                    Action="lambda:GetLayerVersion",
-                    Principal="*",
-             )
+                LayerName=layer_name,
+                VersionNumber=layer_version,
+                StatementId="make_public",
+                Action="lambda:GetLayerVersion",
+                Principal="*",
+            )
             
-
     print('result', ok)
 
 
