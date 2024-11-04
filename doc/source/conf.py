@@ -24,8 +24,6 @@ autodoc_member_order = 'bysource'
 # Make sure section targets are unique
 autosectionlabel_prefix_document=True
 
-
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
