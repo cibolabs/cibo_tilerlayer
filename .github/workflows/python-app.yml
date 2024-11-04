@@ -16,4 +16,4 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v1
     - name: Lint with flake8
-      uses: py-actions/flake8@v
+      uses: py-actions/flake8@v2
