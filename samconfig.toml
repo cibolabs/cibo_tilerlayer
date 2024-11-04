@@ -1,0 +1,129 @@
+# This file is part of Cibo Tiler.
+# Copyright (C) 2024 Cibolabs.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# More information about the configuration file can be found here:
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-config.html
+
+# To build for x86_64, change the build_image to use the latest-x86_64 tag 
+# and add Architecture=\"x86_64\" to parameter_overrides
+
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "cibo-tilerlayer"
+
+[default.build.parameters]
+cached = true
+parallel = true
+build_image = "public.ecr.aws/sam/build-python3.12:latest-arm64"
+use_container = true
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = 'us-west-2'
+
+[default.package.parameters]
+resolve_s3 = true
+
+[default.sync.parameters]
+watch = true
+
+[default.local.parameters]
+skip_pull_image = true
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+[default.local_start_lambda.parameters]
+warm_containers = "EAGER"
+
+[dev]
+[dev.global.parameters]
+stack_name = "cibo-tilerlayer-dev"
+
+[dev.build.parameters]
+cached = true
+parallel = true
+build_image = "public.ecr.aws/sam/build-python3.12:latest-arm64"
+use_container = true
+
+[dev.deploy.parameters]
+parameter_overrides = "Environment=\"dev\""
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-west-2"
+s3_prefix = "cibo-tilerlayer-dev"
+#disable_rollback = true
+image_repositories = []
+tags = ["LambdaDev=1"]
+
+[dev.local_start_api.parameters]
+parameter_overrides = "Environment=\"dev\""
+warm_containers = "EAGER"
+debug = true
+log_file = "/dev/stdout"
+region = 'us-west-2'
+
+[dev.local_start_lambda.parameters]
+parameter_overrides = "Environment=\"dev\""
+warm_containers = "EAGER"
+debug = true
+log_file = "/dev/stdout"
+region = 'us-west-2'
+
+[prod]
+[prod.global.parameters]
+stack_name = "cibo-tilerlayer-prod"
+
+[prod.build.parameters]
+cached = true
+parallel = true
+build_image = "public.ecr.aws/sam/build-python3.12:latest-arm64"
+use_container = true
+
+
+[prod.deploy.parameters]
+parameter_overrides = "Environment=\"prod\""
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-west-2"
+s3_prefix = "cibo-tilerlayer-prod"
+#disable_rollback = true
+image_repositories = []
+tags = ["LambdaProd=1"]
+
+
+[prod.local_start_api.parameters]
+parameter_overrides = "Environment=\"prod\""
+warm_containers = "EAGER"
+debug = true
+log_file = "/dev/stdout"
+region = 'us-west-2'
+
+[prod.local_start_lambda.parameters]
+parameter_overrides = "Environment=\"prod\""
+warm_containers = "EAGER"
+debug = true
+log_file = "/dev/stdout"
+region = 'us-west-2'
