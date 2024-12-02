@@ -30,6 +30,7 @@ and not intended for use by an application.
 
 import io
 import threading
+import concurrent.futures
 import numpy
 from osgeo import gdal
 from osgeo import gdal_array
@@ -227,6 +228,248 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
 
     result = createBytesIOFromMEM(mem, fmt)
     return result
+
+
+def getDataForFile(filename, tileSize, tlx, tly, brx, bry, bands, resampling):
+    """
+    Internal method. Intended to be called from a sub thread.
+
+    Parameters
+    ----------
+    filename : str or gdal.Dataset
+    tileSize : int
+        Size in pixels of the returned tile.
+    tlx, tly, brx, bry: int
+        Bounds of the tile in webmercator
+    bands : sequence of ints
+    resampling: str    
+    
+    Returns
+    -------
+    tuple of (data, dataslice, list of nodata)
+
+    """
+    if isinstance(filename, gdal.Dataset):
+        ds = filename
+    else:
+        ds = gdal.Open(filename)
+    metadata = Metadata(ds)
+
+    data, dataslice = getRawImageChunk(ds, metadata, 
+        tileSize, tileSize, tlx, tly, brx, bry, bands,
+        resampling)
+
+    nodataForBands = [metadata.allIgnore[n - 1] for n in bands]
+
+    return data, dataslice, nodataForBands
+
+
+def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None, 
+        resampling='near', fmt='PNG', tileSize=256, outTileType=numpy.uint8,
+        metadata=None):
+    """
+    Similar to getTile() but takes a list of filenames. They are opened
+    and read in parallel then mosaiced together.
+
+    Note that the nodata must be set on all the bands of the filenames so
+    that the correct data can be mosaiced together.
+
+    Parameters
+    ----------
+    filenames : list of str or gdal.Dataset
+        A list of filenames (or gdal.Datasets) to extract the tile from. 
+        These files should be in webmercator (EPSG:3857) 
+        projection. Use a path starting with /vsis3 to open from an 
+        S3 bucket. The Lambda must be set up with the correct permissions 
+        to access this file.
+        The files are mosaiced in order first to last and later images
+        only overwrite earlier ones when they are not the nodata value.
+    z : int
+        Zoom level
+    x : int
+        X position on the web mercator grid
+    y : int
+        Y position on the web mercator grid
+    bands : None or sequence of ints
+        A sequence of 1-based band indices are required. 
+        Note that if you are passing a colormap there needs to be only
+        one band, otherwise 3 (and only 3) are required.
+        Unlike getTiler() this is NOT optional.
+    rescaling : sequence of (float, float) tuples, optional
+        If the data is to be stretched, pass the range of values that
+        the data is to be linearly stretched between. This should be the
+        same length as 'bands'. Cannot be passed if colormap is used.
+    colormap : numpy.array, optional
+        A numpy array of shape (4, maxPixelValue) that defines the colormap
+        to be applied to a single band image.
+    resampling : str, optional
+        Name of resampling method to be used when zoomed in more than the 
+        image supported. Currently only 'near' and 'bilinear' is supported.
+    fmt : str, optional
+        Name of GDAL driver that creates the image format that needs to be
+        returned. Defaults to 'PNG'
+    tileSize : int, optional
+        Size in pixels of the returned tile. The returned tile will be this
+        size in both the x and y dimensions. Defaults to 256x256.
+    outTileType : numpy dtype, optional
+        The type of the returned image. Defaults to uint8.
+    metadata : instance of Metadata, optional
+        If previously obtained, an instance of a Metadata for filename.
+        Default is this will be obtained withing the function.
+    
+    Returns
+    -------
+    io.BytesIO
+        The binary data that contains the image tile.
+
+    """
+
+    # TODO: should we always assume WebMercator tiling?
+    tlx, tly, brx, bry = getExtentforWebMTile(z, x, y)
+
+    # bands
+    if len(bands) != 1 and len(bands) != 3 and len(bands) != 4:
+        raise ValueError('invalid number of bands (valid: 1, 3 or 4)')
+
+    numOutBands = len(bands)
+    if colormap is not None:
+        # color map when applied will give us 4 bands
+        numOutBands = 4
+    elif len(bands) == 3:
+        # we'll fake an alpha here
+        numOutBands = 4
+    # otherwise we 4 bands already or have single band data (?)
+
+    # open and read all the data in parallel
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        dataFutures = [executor.submit(filename, tileSize, tlx, tly, brx, bry, 
+            bands, resampling) for filename in filenames]
+        results = []
+        for future in concurrent.futures.as_completed(dataFutures):
+            results.append(future.result())
+            
+    maxOutVal = numpy.iinfo(outTileType).max
+
+    # output MEM dataset to write into
+    gdalType = gdal_array.NumericTypeCodeToGDALTypeCode(outTileType)
+    mem = gdal.GetDriverByName('MEM').Create('', tileSize, 
+        tileSize, numOutBands, gdalType)
+
+    allDataNone = True
+    for data, dataslice, nodataForBands in results:
+        if data is not None:
+            allDataNone = False
+            break
+
+    alphaset = False
+    if allDataNone:
+        # no data available for this area - return all zeros
+        for n in range(4):
+            band = mem.GetRasterBand(n + 1)
+            band.Fill(0)
+        alphaset = True
+    else:
+        imgData = numpy.zeros((len(bands), tileSize, tileSize), dtype=outTileType)
+        nodataMask = None
+
+        # rescale.
+        if rescaling is not None:
+            if len(rescaling) == 1:
+                # same rescaling to every band
+                minVal, maxVal = rescaling[0]
+                minMaxRange = maxVal - minVal
+                for data, dataslice, nodataForBands in results:
+                    for n in range(len(bands)):
+                        # cope with 2d/3d
+                        databand = data
+                        if len(bands) > 1:
+                            databand = data[n]
+                        mask = databand == nodataForBands[n]
+                        if nodataMask is None:
+                            nodataMask = mask
+                        else:
+                            # Note logic different from getTile as we are filling in
+                            nodataMask &= mask
+
+                        rescaleddata = (databand.astype(float) - minVal).clip(min=0) * (maxOutVal / minMaxRange)
+                        rescaleddata = rescaleddata.clip(min=0, max=maxOutVal)
+                        imgData[n][dataslice] = numpy.where(mask, imgData[n][dataslice], rescaleddata)
+
+            else:
+                if len(rescaling) != len(bands):
+                    raise ValueError("length of rescaling doesn't math number of bands")
+                for data, dataslice, nodataForBands in results:
+                    for n, (minVal, maxVal) in enumerate(rescaling):
+                        minMaxRange = maxVal - minVal
+
+                        mask = data[n] == nodataForBands[n]
+                        if nodataMask is None:
+                            nodataMask = mask
+                        else:
+                            # Note logic different from getTile as we are filling in
+                            nodataMask &= mask
+
+                        rescaleddata = (data[n].astype(float) - minVal).clip(min=0) * (maxOutVal / minMaxRange)
+                        rescaleddata = rescaleddata.clip(min=0, max=maxOutVal)
+                        imgData[n][dataslice] = numpy.where(mask, imgData[n][dataslice], rescaleddata)
+
+            alphaset = len(bands) >= 4
+
+        elif colormap is not None:
+            # Note: currently can't specify rescaling AND colormap
+            _, maxCol = colormap.shape
+            for data, dataslice, nodataForBands in results:
+                for n in range(4):
+
+                    mask = data[n] == nodataForBands[n]
+                    if nodataMask is None:
+                        nodataMask = mask
+                    else:
+                        # Note logic different from getTile as we are filling in
+                        nodataMask &= mask
+
+                imgData[n][dataslice] = numpy.where(mask, 
+                    imgData[n][dataslice],
+                    colormap[n][data.clip(min=0, max=(maxCol - 1))])
+            alphaset = True
+
+        else:
+            # just copy data
+            for data, dataslice, nodataForBands in results:
+                for n in range(len(bands)):
+                    # cope with 2d/3d
+                    databand = data
+                    if len(bands) > 1:
+                        databand = data[n]
+
+                    mask = databand == nodataForBands[n]
+                    if nodataMask is None:
+                        nodataMask = mask
+                    else:
+                         # Note logic different from getTile as we are filling in
+                        nodataMask &= mask
+
+                    imgData[n][dataslice] = numpy.where(mask, 
+                        imgData[n][dataslice], databand)
+
+            alphaset = len(bands) >= 4
+
+    # now write the data to the mem dataset
+    for n in range(3):
+        band = mem.GetRasterBand(n + 1)
+        band.WriteArray(imgData[n])
+
+    if not alphaset:
+        band = mem.GetRasterBand(4)
+        if nodataMask is not None:
+            band.WriteArray(numpy.where(nodataMask, 
+                outTileType(0), outTileType(maxOutVal)))
+        else:
+            band.Fill(maxOutVal)
+
+    result = createBytesIOFromMEM(mem, fmt)
+    return result
+
 
 
 def getExtentforWebMTile(z, x, y):
