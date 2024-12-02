@@ -37,8 +37,8 @@ from osgeo import gdal
 # This will mean that you don't need to rebuild the layer
 # each time there is a change.
 # Remember to revert (and delete tilertest/tiling.py before deploying!
-# import tiling
-from cibotiler import tiling
+import tiling
+# from cibotiler import tiling
 
 
 # Some test colour intervals
@@ -185,6 +185,30 @@ def doRescaleTestBilinear(z: int, x: int, y: int):
 
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.post('/test_rescale_nn_mosaic/<z>/<x>/<y>', cors=True)
+def doRescaleTestNNMosaic(z: int, x: int, y: int):
+    """
+    Rescale the FC (3 bands, all 100-200).
+
+    Mosaic the paths together
+    """
+    paths = app.current_event.json_body['paths']
+    #vrts = []
+    #tempdirs = []
+    #for bandpaths in paths:
+    #    vrt, tempdir = makeVRT(paths)
+    #    vrts.append(vrt)
+    #    tempdirs.append(tempdir)
+
+    tile = tiling.getTileMosaic(paths, z, x, y, bands=[1, 1, 1], rescaling=[(0, 1000)])
+
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+    
+
 
     
 # Enrich logging with contextual information from Lambda

@@ -35,7 +35,8 @@ import numpy
 from osgeo import gdal
 from osgeo import gdal_array
 
-from . import resamplerhelper
+#from . import resamplerhelper
+from cibotiler import resamplerhelper
 
 gdal.UseExceptions()
 
@@ -294,7 +295,7 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
         A sequence of 1-based band indices are required. 
         Note that if you are passing a colormap there needs to be only
         one band, otherwise 3 (and only 3) are required.
-        Unlike getTiler() this is NOT optional.
+        Unlike getTile() this is NOT optional.
     rescaling : sequence of (float, float) tuples, optional
         If the data is to be stretched, pass the range of values that
         the data is to be linearly stretched between. This should be the
@@ -342,10 +343,10 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
 
     # open and read all the data in parallel
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        dataFutures = [executor.submit(filename, tileSize, tlx, tly, brx, bry, 
-            bands, resampling) for filename in filenames]
+        futures = {executor.submit(getDataForFile, filename, tileSize, 
+            tlx, tly, brx, bry, bands, resampling): filename for filename in filenames}
         results = []
-        for future in concurrent.futures.as_completed(dataFutures):
+        for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
             
     maxOutVal = numpy.iinfo(outTileType).max
@@ -364,12 +365,12 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
     alphaset = False
     if allDataNone:
         # no data available for this area - return all zeros
-        for n in range(4):
+        for n in range(numOutBands):
             band = mem.GetRasterBand(n + 1)
             band.Fill(0)
         alphaset = True
     else:
-        imgData = numpy.zeros((len(bands), tileSize, tileSize), dtype=outTileType)
+        imgData = numpy.zeros((numOutBands, tileSize, tileSize), dtype=outTileType)
         nodataMask = None
 
         # rescale.
@@ -454,18 +455,18 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
 
             alphaset = len(bands) >= 4
 
-    # now write the data to the mem dataset
-    for n in range(3):
-        band = mem.GetRasterBand(n + 1)
-        band.WriteArray(imgData[n])
+        # now write the data to the mem dataset
+        for n in range(numOutBands):
+            band = mem.GetRasterBand(n + 1)
+            band.WriteArray(imgData[n])
 
-    if not alphaset:
-        band = mem.GetRasterBand(4)
-        if nodataMask is not None:
-            band.WriteArray(numpy.where(nodataMask, 
+        if not alphaset:
+            band = mem.GetRasterBand(4)
+            if nodataMask is not None:
+                band.WriteArray(numpy.where(nodataMask, 
                 outTileType(0), outTileType(maxOutVal)))
-        else:
-            band.Fill(maxOutVal)
+            else:
+                band.Fill(maxOutVal)
 
     result = createBytesIOFromMEM(mem, fmt)
     return result
