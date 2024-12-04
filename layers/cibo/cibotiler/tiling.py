@@ -373,7 +373,7 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
         alphaset = True
     else:
         imgData = numpy.zeros((numOutBands, tileSize, tileSize), dtype=outTileType)
-        nodataMask = numpy.ones((tileSize, tileSize), dtype=bool) # start with all nodata
+        nodataMask = numpy.ones((tileSize, tileSize), dtype=bool)  # start with all nodata
 
         # rescale.
         if rescaling is not None:
@@ -458,7 +458,6 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
 
     result = createBytesIOFromMEM(mem, fmt)
     return result
-
 
 
 def getExtentforWebMTile(z, x, y):

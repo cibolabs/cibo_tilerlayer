@@ -255,7 +255,6 @@ def createTests(cmdargs):
     tests['test_rescale_bilinear_mosaic'] = ('/test_rescale_bilinear_mosaic/{}/{}/{}'.format(
         TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y), pathsfortest_zoom)
     
-
     return tests
 
 

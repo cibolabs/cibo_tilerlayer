@@ -209,13 +209,17 @@ def get_all_vrts(paths):
 
     return vrts, tempdirs
 
+
 def clean_tempdirs(tempdirs):
+    """
+    Helper to remove a each directory in a list
+    """
     for t in tempdirs:
         shutil.rmtree(t)
 
 
 @app.post('/test_colormap_interval_mosaic/<z>/<x>/<y>', cors=True)
-def doColorMapIntervalTest(z: int, x: int, y: int):
+def doColorMapIntervalTestMos(z: int, x: int, y: int):
     """
     Do a simple test of the color map interval stuff
     """
@@ -231,7 +235,7 @@ def doColorMapIntervalTest(z: int, x: int, y: int):
 
 
 @app.post('/test_colormap_point_mosaic/<z>/<x>/<y>', cors=True)
-def doColorMapPointTest(z: int, x: int, y: int):
+def doColorMapPointTestMos(z: int, x: int, y: int):
     """
     Do a simple test of the color map interpolation stuff
     """
@@ -247,7 +251,7 @@ def doColorMapPointTest(z: int, x: int, y: int):
 
 
 @app.post('/test_rescale_mosaic/<z>/<x>/<y>', cors=True)
-def doRescaleTest(z: int, x: int, y: int):
+def doRescaleTestMos(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
     """
@@ -262,7 +266,7 @@ def doRescaleTest(z: int, x: int, y: int):
 
 
 @app.post('/test_rescale_nn_mosaic/<z>/<x>/<y>', cors=True)
-def doRescaleTestNN(z: int, x: int, y: int):
+def doRescaleTestNNMos(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
     """
@@ -278,7 +282,7 @@ def doRescaleTestNN(z: int, x: int, y: int):
 
 
 @app.post('/test_rescale_bilinear_mosaic/<z>/<x>/<y>', cors=True)
-def doRescaleTestBilinear(z: int, x: int, y: int):
+def doRescaleTestBilinearMos(z: int, x: int, y: int):
     """
     Rescale the FC (3 bands, all 100-200).
     """
