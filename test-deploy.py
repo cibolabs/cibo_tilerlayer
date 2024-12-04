@@ -84,6 +84,10 @@ def getCmdArgs():
         help="Number of days before today to start the STAC search window. (default=%(default)s)")
     p.add_argument('--layerpublic', default=False, action="store_true",
         help="Make deployed layer public (only valid with -m deploy)")
+    p.add_argument('--maxdates', default=3, type=int,
+        help="Maximum number of dates for testing mosaic functionality. (default=%(default)s)")
+    p.add_argument('--ignoresame', default=False, action="store_true",
+        help="Ignore the 'All bands are the same value' error which can happen when nodata is returned")
 
     cmdargs = p.parse_args()
     return cmdargs
@@ -165,25 +169,31 @@ def getPathsForTile(z, x, y, cmdargs):
         raise SystemExit("no matching images found")
 
     tiles = s2Search.items()
-    # look at the first tile
-    tile = next(tiles)
-    paths = []
-    # grab 3 bands
-    for band in ['blue', 'green', 'red']:
-        url = tile.assets[band].get_absolute_href()
-        url = url.replace('https://sentinel-cogs.s3.us-west-2.amazonaws.com', '/vsis3/sentinel-cogs')
-        paths.append(url)
+    count = 0
+    all_paths = []
+    for tile in tiles:
+        paths = []
+        # grab 3 bands
+        for band in ['blue', 'green', 'red']:
+            url = tile.assets[band].get_absolute_href()
+            url = url.replace('https://sentinel-cogs.s3.us-west-2.amazonaws.com', '/vsis3/sentinel-cogs')
+            paths.append(url)
+        all_paths.append(paths)
+        count += 1
+        if count >= cmdargs.maxdates:
+            break
         
-    return paths
+    return all_paths
     
 
-def openPNGAndGetMean(data):
+def openPNGAndGetMean(data, cmdargs):
     """
     Open a PNG. Check there are 4 bands. 
 
     TODO: be more thorough in checks
     """
     img = Image.open(io.BytesIO(data))
+    img.save('/tmp/test.png')
     arr = numpy.array(img)
     assert len(arr.shape) == 3
     # Not sure why the indexing is around the other way
@@ -197,7 +207,8 @@ def openPNGAndGetMean(data):
         # sometimes PIL coverts 2 band images (val, alpha)
         # to 4 band ones by repeating the first band.
         print('All bands are the same value')
-        return False
+        if not cmdargs.ignoresame:
+            return False
 
     return True
     
@@ -220,16 +231,30 @@ def createTests(cmdargs):
     pathsfortest_zoom = getPathsForTile(TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y, cmdargs)
     
     tests = {}
+    # First tests, just use one image
     tests['test_interval'] = ('/test_colormap_interval/{}/{}/{}'.format(
-        TEST_Z, TEST_X, TEST_Y), pathsfortest)
+        TEST_Z, TEST_X, TEST_Y), pathsfortest[0])
     tests['test_point'] = ('/test_colormap_point/{}/{}/{}'.format(
-        TEST_Z, TEST_X, TEST_Y), pathsfortest)
+        TEST_Z, TEST_X, TEST_Y), pathsfortest[0])
     tests['test_rescale'] = ('/test_rescale/{}/{}/{}'.format(
-        TEST_Z, TEST_X, TEST_Y), pathsfortest)
+        TEST_Z, TEST_X, TEST_Y), pathsfortest[0])
     tests['test_rescale_nn'] = ('/test_rescale_nn/{}/{}/{}'.format(
-        TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y), pathsfortest_zoom)
+        TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y), pathsfortest_zoom[0])
     tests['test_rescale_bilinear'] = ('/test_rescale_bilinear/{}/{}/{}'.format(
+        TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y), pathsfortest_zoom[0])
+
+    # do the first tests again, but using the mosaic functionality, passing multiple images in
+    tests['test_interval_mosaic'] = ('/test_colormap_interval_mosaic/{}/{}/{}'.format(
+        TEST_Z, TEST_X, TEST_Y), pathsfortest)
+    tests['test_point_mosaic'] = ('/test_colormap_point_mosaic/{}/{}/{}'.format(
+        TEST_Z, TEST_X, TEST_Y), pathsfortest)
+    tests['test_rescale_mosaic'] = ('/test_rescale_mosaic/{}/{}/{}'.format(
+        TEST_Z, TEST_X, TEST_Y), pathsfortest)
+    tests['test_rescale_nn_mosaic'] = ('/test_rescale_nn_mosaic/{}/{}/{}'.format(
         TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y), pathsfortest_zoom)
+    tests['test_rescale_bilinear_mosaic'] = ('/test_rescale_bilinear_mosaic/{}/{}/{}'.format(
+        TEST_ZOOM_Z, TEST_ZOOM_X, TEST_ZOOM_Y), pathsfortest_zoom)
+    
     return tests
 
 
@@ -280,7 +305,7 @@ def main():
                     headers={'Accept': 'image/png'})
                 outdata = r.content
                 ok = False
-                ok = openPNGAndGetMean(outdata)
+                ok = openPNGAndGetMean(outdata, cmdargs)
                 if cmdargs.save:
                     saveImage(outdata, testName)
                 if not ok:
@@ -308,7 +333,7 @@ def main():
                 headers={'Accept': 'image/png'})
             outdata = r.content
             ok = False
-            ok = openPNGAndGetMean(outdata)
+            ok = openPNGAndGetMean(outdata, cmdargs)
             if cmdargs.save:
                 saveImage(outdata, testName)
             if not ok:

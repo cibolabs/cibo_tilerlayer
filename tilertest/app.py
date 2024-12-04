@@ -103,6 +103,9 @@ def makeVRT(paths):
     return warpVRT, tempDir
 
 
+########################################
+# Below are the single date tests
+
 @app.post('/test_colormap_interval/<z>/<x>/<y>', cors=True)
 def doColorMapIntervalTest(z: int, x: int, y: int):
     """
@@ -186,7 +189,114 @@ def doRescaleTestBilinear(z: int, x: int, y: int):
     return Response(body=tile.getvalue(),
                 status_code=200, headers={'Content-Type': 'image/png'})
 
-    
+
+########################################
+# Below are the mosaic tests
+
+
+def get_all_vrts(paths):
+    """
+    Helper function for the 'mosaic' testing endpoints
+    Takes a list, each item is a list with all the bands
+    for a date.
+    """
+    vrts = []
+    tempdirs = []
+    for sub_path in paths:
+        vrt, tempdir = makeVRT(sub_path)
+        vrts.append(vrt)
+        tempdirs.append(tempdir)
+
+    return vrts, tempdirs
+
+
+def clean_tempdirs(tempdirs):
+    """
+    Helper to remove a each directory in a list
+    """
+    for t in tempdirs:
+        shutil.rmtree(t)
+
+
+@app.post('/test_colormap_interval_mosaic/<z>/<x>/<y>', cors=True)
+def doColorMapIntervalTestMos(z: int, x: int, y: int):
+    """
+    Do a simple test of the color map interval stuff
+    """
+    paths = app.current_event.json_body['paths']
+    vrts, tempdirs = get_all_vrts(paths)
+    colormap = tiling.createColorMapFromIntervals(INTERVALS)
+    tile = tiling.getTileMosaic(vrts, z, x, y, bands=[1], 
+        colormap=colormap)
+
+    clean_tempdirs(tempdirs)
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.post('/test_colormap_point_mosaic/<z>/<x>/<y>', cors=True)
+def doColorMapPointTestMos(z: int, x: int, y: int):
+    """
+    Do a simple test of the color map interpolation stuff
+    """
+    paths = app.current_event.json_body['paths']
+    vrts, tempdirs = get_all_vrts(paths)
+    colormap = tiling.createColorMapFromPoints(POINTS)
+    tile = tiling.getTileMosaic(vrts, z, x, y, bands=[1], 
+        colormap=colormap)
+
+    clean_tempdirs(tempdirs)
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.post('/test_rescale_mosaic/<z>/<x>/<y>', cors=True)
+def doRescaleTestMos(z: int, x: int, y: int):
+    """
+    Rescale the FC (3 bands, all 100-200).
+    """
+    paths = app.current_event.json_body['paths']
+    vrts, tempdirs = get_all_vrts(paths)
+    tile = tiling.getTileMosaic(vrts, z, x, y, bands=[1, 2, 3],
+        rescaling=[(0, 1000), (0, 1000), (0, 1000)])
+
+    clean_tempdirs(tempdirs)
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.post('/test_rescale_nn_mosaic/<z>/<x>/<y>', cors=True)
+def doRescaleTestNNMos(z: int, x: int, y: int):
+    """
+    Rescale the FC (3 bands, all 100-200).
+    """
+    paths = app.current_event.json_body['paths']
+    vrts, tempdirs = get_all_vrts(paths)
+    tile = tiling.getTileMosaic(vrts, z, x, y, 
+        bands=[1, 2, 3], resampling='near',
+        rescaling=[(0, 1000), (0, 1000), (0, 1000)])
+
+    clean_tempdirs(tempdirs)
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
+@app.post('/test_rescale_bilinear_mosaic/<z>/<x>/<y>', cors=True)
+def doRescaleTestBilinearMos(z: int, x: int, y: int):
+    """
+    Rescale the FC (3 bands, all 100-200).
+    """
+    paths = app.current_event.json_body['paths']
+    vrts, tempdirs = get_all_vrts(paths)
+    tile = tiling.getTileMosaic(vrts, z, x, y,
+        bands=[1, 2, 3], resampling='bilinear',
+        rescaling=[(0, 1000), (0, 1000), (0, 1000)])
+
+    clean_tempdirs(tempdirs)
+    return Response(body=tile.getvalue(),
+                status_code=200, headers={'Content-Type': 'image/png'})
+
+
 # Enrich logging with contextual information from Lambda
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 # Adding tracer
