@@ -35,8 +35,7 @@ import numpy
 from osgeo import gdal
 from osgeo import gdal_array
 
-#from . import resamplerhelper
-from cibotiler import resamplerhelper
+from . import resamplerhelper
 
 gdal.UseExceptions()
 
@@ -124,6 +123,7 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
     if colormap is not None:
         # color map when applied will give us 4 bands
         numOutBands = 4
+        assert len(bands) == 1
     elif len(bands) == 3:
         # we'll fake an alpha here
         numOutBands = 4
@@ -194,8 +194,9 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
         elif colormap is not None:
             # Note: currently can't specify rescaling AND colormap
             _, maxCol = colormap.shape
+            data = data.clip(min=0, max=(maxCol - 1))
             for n in range(4):
-                imgData[dataslice] = colormap[n][data.clip(min=0, max=(maxCol - 1))]
+                imgData[dataslice] = colormap[n][data]
                 band = mem.GetRasterBand(n + 1)
                 band.WriteArray(imgData)
             alphaset = True
@@ -336,6 +337,7 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
     if colormap is not None:
         # color map when applied will give us 4 bands
         numOutBands = 4
+        assert len(bands) == 1
     elif len(bands) == 3:
         # we'll fake an alpha here
         numOutBands = 4
@@ -371,7 +373,7 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
         alphaset = True
     else:
         imgData = numpy.zeros((numOutBands, tileSize, tileSize), dtype=outTileType)
-        nodataMask = None
+        nodataMask = numpy.ones((tileSize, tileSize), dtype=bool) # start with all nodata
 
         # rescale.
         if rescaling is not None:
@@ -386,11 +388,8 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
                         if len(bands) > 1:
                             databand = data[n]
                         mask = databand == nodataForBands[n]
-                        if nodataMask is None:
-                            nodataMask = mask
-                        else:
-                            # Note logic different from getTile as we are filling in
-                            nodataMask &= mask
+                        # Note logic different from getTile as we are filling in
+                        nodataMask[dataslice] &= mask
 
                         rescaleddata = (databand.astype(float) - minVal).clip(min=0) * (maxOutVal / minMaxRange)
                         rescaleddata = rescaleddata.clip(min=0, max=maxOutVal)
@@ -404,11 +403,8 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
                         minMaxRange = maxVal - minVal
 
                         mask = data[n] == nodataForBands[n]
-                        if nodataMask is None:
-                            nodataMask = mask
-                        else:
-                            # Note logic different from getTile as we are filling in
-                            nodataMask &= mask
+                        # Note logic different from getTile as we are filling in
+                        nodataMask[dataslice] &= mask
 
                         rescaleddata = (data[n].astype(float) - minVal).clip(min=0) * (maxOutVal / minMaxRange)
                         rescaleddata = rescaleddata.clip(min=0, max=maxOutVal)
@@ -420,18 +416,13 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
             # Note: currently can't specify rescaling AND colormap
             _, maxCol = colormap.shape
             for data, dataslice, nodataForBands in results:
+                data = data.clip(min=0, max=(maxCol - 1))
+                mask = data == nodataForBands[0]  # always single band
+                nodataMask[dataslice] &= mask
                 for n in range(4):
 
-                    mask = data[n] == nodataForBands[n]
-                    if nodataMask is None:
-                        nodataMask = mask
-                    else:
-                        # Note logic different from getTile as we are filling in
-                        nodataMask &= mask
-
-                imgData[n][dataslice] = numpy.where(mask, 
-                    imgData[n][dataslice],
-                    colormap[n][data.clip(min=0, max=(maxCol - 1))])
+                    imgData[n][dataslice] = numpy.where(mask, 
+                        imgData[n][dataslice], colormap[n][data])
             alphaset = True
 
         else:
@@ -444,11 +435,8 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
                         databand = data[n]
 
                     mask = databand == nodataForBands[n]
-                    if nodataMask is None:
-                        nodataMask = mask
-                    else:
-                         # Note logic different from getTile as we are filling in
-                        nodataMask &= mask
+                    # Note logic different from getTile as we are filling in
+                    nodataMask[dataslice] &= mask
 
                     imgData[n][dataslice] = numpy.where(mask, 
                         imgData[n][dataslice], databand)
@@ -460,7 +448,7 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
             band = mem.GetRasterBand(n + 1)
             band.WriteArray(imgData[n])
 
-        if not alphaset:
+        if not alphaset and numOutBands >= 4:
             band = mem.GetRasterBand(4)
             if nodataMask is not None:
                 band.WriteArray(numpy.where(nodataMask, 
