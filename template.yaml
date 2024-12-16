@@ -53,7 +53,7 @@ Resources:
       CompatibleArchitectures:
         - !Ref Architecture
       CompatibleRuntimes:
-        - python3.12
+        - !Ref Runtime
       LicenseInfo: GPL-3.0-or-later
       LayerName: !Sub 
         - 'CiboTilerLayer-${RuntimeNoDot}-${Architecture}-${Environment}'
