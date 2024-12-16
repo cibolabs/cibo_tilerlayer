@@ -20,12 +20,6 @@ Description: >
 
   SAM Template for cibo_tilerlayer
 
-Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
-  Function:
-    Timeout: 30
-    MemorySize: 512
-    Runtime: python3.12
-
 Parameters:
   Environment:
     Type: String
@@ -38,6 +32,18 @@ Parameters:
     AllowedValues:
       - arm64
       - x86_64
+  PowerToolsLayerVersion:
+    Type: Number
+    Default: 4
+  Runtime: 
+    Type: String
+    Default: python3.12
+
+Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: !Ref Runtime
 
 Resources:
   CiboTilerLayer:
@@ -47,9 +53,11 @@ Resources:
       CompatibleArchitectures:
         - !Ref Architecture
       CompatibleRuntimes:
-        - python3.12
+        - !Ref Runtime
       LicenseInfo: GPL-3.0-or-later
-      LayerName: !Sub 'CiboTilerLayer${Architecture}${Environment}'
+      LayerName: !Sub 
+        - 'CiboTilerLayer-${RuntimeNoDot}-${Architecture}-${Environment}'
+        - RuntimeNoDot: !Join ['', !Split ['.', !Ref Runtime] ] 
     Metadata:
       BuildMethod: makefile
       BuildArchitecture: !Ref Architecture
@@ -90,6 +98,10 @@ Resources:
             RestApiId: !Ref TestAPI
       Layers:
         - !Ref CiboTilerLayer
+        - !Sub
+          - 'arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-${RuntimeNoDot}-arm64:${PowerToolsLayerVersion}'
+          - RuntimeNoDot: !Join ['', !Split ['.', !Ref Runtime] ]
+         
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: PowertoolsOziusAPI
