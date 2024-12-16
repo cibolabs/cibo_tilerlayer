@@ -358,14 +358,11 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
     mem = gdal.GetDriverByName('MEM').Create('', tileSize, 
         tileSize, numOutBands, gdalType)
 
-    allDataNone = True
-    for data, dataslice, nodataForBands in results:
-        if data is not None:
-            allDataNone = False
-            break
+    # remove any None data in results - will be outside of tile bounds
+    results = [x for x in results if x[0] is not None]
 
     alphaset = False
-    if allDataNone:
+    if len(results) == 0:
         # no data available for this area - return all zeros
         for n in range(numOutBands):
             band = mem.GetRasterBand(n + 1)
