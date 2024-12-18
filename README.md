@@ -4,7 +4,7 @@
 
 | Layer Version | ARN | Python Version | Architecture |
 | ------------- | --- | -------------- | ------------ |
-| 1 | arn:aws:lambda:us-west-2:331561773057:layer:CiboTilerLayerarm64dev:1 | 3.12 | arm64 |
+| 1 | arn:aws:lambda:us-west-2:331561773057:layer:CiboTilerLayer-python312-arm64-prod:1 | 3.12 | arm64 |
 
 ## Documentation 
 
