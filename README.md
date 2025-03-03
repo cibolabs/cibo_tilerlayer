@@ -1,22 +1,8 @@
 # cibo_tilerlayer
 
-## Introduction
+## What is cibo_tilerlayer?
 
-CiboTiler is for those who:
-
-- want to be able to serve up imagery in a web tiler without running gdal2tiles
-- have imagery already in EPSG:3857
-- are comfortable deploying solutions with AWS Lambda or similar
-
-## What it does
-
-Given a GDAL readable image and a X/Y/Z tile location (plus some information on bands/how you want it displayed etc)
-it returns an image file to display in the client. For best performance, ensure a reasonable
-set of overview layers are present in the input image.
-
-## How you would likely use it
-
-To create an HTTP endpoint (using AWS Lambda or similar) to serve up tiles from your image(s).
+Please refer to the [documentation](https://cibotilerlayer.readthedocs.io/).
 
 ## Current Layer Versions
 
