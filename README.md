@@ -1,5 +1,23 @@
 # cibo_tilerlayer
 
+## Introduction
+
+CiboTiler is for those who:
+
+- want to be able to serve up imagery in a web tiler without running gdal2tiles
+- have imagery already in EPSG:3857
+- are comfortable deploying solutions with AWS Lambda or similar
+
+## What it does
+
+Given a GDAL readable image and a X/Y/Z tile location (plus some information on bands/how you want it displayed etc)
+it returns an image file to display in the client. For best performance, ensure a reasonable
+set of overview layers are present in the input image.
+
+## How you would likely use it
+
+To create an HTTP endpoint (using AWS Lambda or similar) to serve up tiles from your image(s).
+
 ## Current Layer Versions
 
 | Layer Version | ARN | Python Version | Architecture |
@@ -27,8 +45,8 @@ We need to have GDAL available with the Python bindings, plus all enough of the 
 dependencies (GEOS, PROJ etc). See [our makefile](https://github.com/cibolabs/cibo_tilerlayer/blob/main/layers/cibo/Makefile)
 for more information.
 
-Currently, we are focused on building for ARM on a AWS Graviton machines. And make layers
-available for this. We will make `x86_64` builds available if there is demand. Do do this yourself
+Currently, we are focused on building for ARM on a AWS Graviton machines and make layers
+available for this architecture. We will make `x86_64` builds available if there is demand. Do do this yourself
 you will need to pass through the `Architecture` parameter as `x86_64` into `template.yaml`.
 
 AWS SAM needs to be installed first. 
@@ -36,14 +54,23 @@ AWS SAM needs to be installed first.
 The install of SAM under Ubuntu isn't totally straightforward. The install
 instructions are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
 
-However, using their install script and installing into `/usr/local` appears to 
+These instructions seem to indicate that installing SAM globally on the machine
+works. However, we have discovered that this appears to 
 introduce a problem where the `LD_LIBRARY_PATH` in the test Lambda function is set 
 incorrectly. There is now an assert in the test function to catch this situation.
 
-The workaround is to cd into the `aws-sam-cli-src` directory and run `pip install .`.
-This will install SAM into your home directory. Note that you will need to log out
-and log back in before this change is reflected in your environment. Note that 
-having a `.bash_profile` file in your home directory will prevent your environment being updated.
+We instead recommend that SAM is installed into a Python virtual env as shown below:
+
+```
+python3 -m venv .sam_venv
+source .sam_venv/bin/activate
+wget https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-arm64.zip
+unzip aws-sam-cli-linux-arm64.zip
+cd aws-sam-cli-src
+pip install .
+```
+
+You will need to activate this virtual env each time you wish to work on cibo_tilerlayer.
 
 ### Testing
 
