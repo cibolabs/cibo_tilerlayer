@@ -24,7 +24,7 @@ If you wish to install the `cibotiling` package in your existing Python environm
 For more information on how to use this package, please refer to the [documentation](https://cibotilerlayer.readthedocs.io/).
 
 
-## Building from Source
+## Developer Guide
 
 Building CiboTiler is a little bit more complex than just installing some Python files.
 We need to have GDAL available with the Python bindings, plus all enough of the GDAL 
@@ -86,6 +86,7 @@ in the test function.
 
 Use `test-deploy.py -m deploy` to deploy (the hopefully tested) Lambda function. 
 Note that whether the dev or prod mode is used is controlled by the `--environment` switch.
+The envrionments are identical but prod is more stable where dev is more cutting edge.
 
 ### Using in projects
 
@@ -94,6 +95,12 @@ or `CiboTilerLayerARN-arm64-prod` CloudFormation stacks. Use this name in Lambda
 layer. Note that you can't use `Fn::ImportValue` in AWS SAM in local mode and that 
 you probably want to use a fixed version of this layer so you don't suddenly get the 
 latest on redeploy.
+
+### Upgrading to a newer cibo_tilerlayer
+
+Note that if you change the layer version, this gets change picked up when you run `sam local` in your
+project. However this doesn't seem to be changed when you run `sam deploy`... You will have to change the layer
+number from the AWS Console instead.
 
 ### Environment Variables
 
