@@ -1,5 +1,9 @@
 # cibo_tilerlayer
 
+## What is cibo_tilerlayer?
+
+Please refer to the [documentation](https://cibotilerlayer.readthedocs.io/).
+
 ## Current Layer Versions
 
 | Layer Version | ARN | Python Version | Architecture |
@@ -20,15 +24,15 @@ If you wish to install the `cibotiling` package in your existing Python environm
 For more information on how to use this package, please refer to the [documentation](https://cibotilerlayer.readthedocs.io/).
 
 
-## Building from Source
+## Developer Guide
 
 Building CiboTiler is a little bit more complex than just installing some Python files.
 We need to have GDAL available with the Python bindings, plus all enough of the GDAL 
 dependencies (GEOS, PROJ etc). See [our makefile](https://github.com/cibolabs/cibo_tilerlayer/blob/main/layers/cibo/Makefile)
 for more information.
 
-Currently, we are focused on building for ARM on a AWS Graviton machines. And make layers
-available for this. We will make `x86_64` builds available if there is demand. Do do this yourself
+Currently, we are focused on building for ARM on a AWS Graviton machines and make layers
+available for this architecture. We will make `x86_64` builds available if there is demand. Do do this yourself
 you will need to pass through the `Architecture` parameter as `x86_64` into `template.yaml`.
 
 AWS SAM needs to be installed first. 
@@ -36,14 +40,23 @@ AWS SAM needs to be installed first.
 The install of SAM under Ubuntu isn't totally straightforward. The install
 instructions are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
 
-However, using their install script and installing into `/usr/local` appears to 
+These instructions seem to indicate that installing SAM globally on the machine
+works. However, we have discovered that this appears to 
 introduce a problem where the `LD_LIBRARY_PATH` in the test Lambda function is set 
 incorrectly. There is now an assert in the test function to catch this situation.
 
-The workaround is to cd into the `aws-sam-cli-src` directory and run `pip install .`.
-This will install SAM into your home directory. Note that you will need to log out
-and log back in before this change is reflected in your environment. Note that 
-having a `.bash_profile` file in your home directory will prevent your environment being updated.
+We instead recommend that SAM is installed into a Python virtual env as shown below:
+
+```
+python3 -m venv .sam_venv
+source .sam_venv/bin/activate
+wget https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-arm64.zip
+unzip aws-sam-cli-linux-arm64.zip
+cd aws-sam-cli-src
+pip install .
+```
+
+You will need to activate this virtual env each time you wish to work on cibo_tilerlayer.
 
 ### Testing
 
@@ -73,6 +86,7 @@ in the test function.
 
 Use `test-deploy.py -m deploy` to deploy (the hopefully tested) Lambda function. 
 Note that whether the dev or prod mode is used is controlled by the `--environment` switch.
+The envrionments are identical but prod is more stable where dev is more cutting edge.
 
 ### Using in projects
 
@@ -81,6 +95,13 @@ or `CiboTilerLayerARN-arm64-prod` CloudFormation stacks. Use this name in Lambda
 layer. Note that you can't use `Fn::ImportValue` in AWS SAM in local mode and that 
 you probably want to use a fixed version of this layer so you don't suddenly get the 
 latest on redeploy.
+
+### Upgrading to a newer cibo_tilerlayer
+
+Note that if you change the layer version, this gets change picked up when you run `sam local` in your
+project. However this doesn't seem to be changed when you run `sam deploy`... The only way to address 
+this appears to select the Lambda function in the AWS Console and click on 'Layers' and then 'Edit' 
+and bump the version here too.
 
 ### Environment Variables
 
