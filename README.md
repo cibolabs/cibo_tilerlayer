@@ -99,8 +99,9 @@ latest on redeploy.
 ### Upgrading to a newer cibo_tilerlayer
 
 Note that if you change the layer version, this gets change picked up when you run `sam local` in your
-project. However this doesn't seem to be changed when you run `sam deploy`... You will have to change the layer
-number from the AWS Console instead.
+project. However this doesn't seem to be changed when you run `sam deploy`... The only way to address 
+this appears to select the Lambda function in the AWS Console and click on 'Layers' and then 'Edit' 
+and bump the version here too.
 
 ### Environment Variables
 
