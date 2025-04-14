@@ -40,24 +40,6 @@ AWS SAM needs to be installed first.
 The install of SAM under Ubuntu isn't totally straightforward. The install
 instructions are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
 
-These instructions seem to indicate that installing SAM globally on the machine
-works. However, we have discovered that this appears to 
-introduce a problem where the `LD_LIBRARY_PATH` in the test Lambda function is set 
-incorrectly. There is now an assert in the test function to catch this situation.
-
-We instead recommend that SAM is installed into a Python virtual env as shown below:
-
-```
-python3 -m venv .sam_venv
-source .sam_venv/bin/activate
-wget https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-arm64.zip
-unzip aws-sam-cli-linux-arm64.zip
-cd aws-sam-cli-src
-pip install .
-```
-
-You will need to activate this virtual env each time you wish to work on cibo_tilerlayer.
-
 ### Testing
 
 NOTE: if you get a 'port in use' error when running `test-deploy.py`, run ::
@@ -105,12 +87,7 @@ and bump the version here too.
 
 ### Environment Variables
 
-In client Lambdas, to be able to find the shared libraries the `LD_LIBRARY_PATH` should be set 
-in the Environment/Variables section like this::
-
-    LD_LIBRARY_PATH: "/opt/python/lib:/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/opt/lib"
-
-You may also wish to set some of the other GDAL options like this::
+You may wish to set some of the other GDAL options like this::
 
     GDAL_DATA: "/opt/python/share/gdal"
     PROJ_LIB: "/opt/python/share/proj"
