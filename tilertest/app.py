@@ -59,11 +59,6 @@ POINTS = [(0, [255, 255, 255, 255]), (1, [215, 25, 28, 255]),
     (300, [8, 96, 9, 255]), (400, [14, 39, 17, 255]), 
     (700, [255, 0, 255, 255]), (1000, [148, 33, 225, 255])]
 
-# If this assert fails then there is something wrong with 
-# your SAM install. Try installing locally (in your home dir).
-LD_PATH = os.getenv('LD_LIBRARY_PATH')
-assert LD_PATH.startswith('/opt/python/lib')
-
 app = APIGatewayRestResolver()
 logger = Logger()
 metrics = Metrics(namespace="Powertools")

@@ -63,7 +63,7 @@ stack_name = "cibo-tilerlayer-dev"
 [dev.build.parameters]
 cached = true
 parallel = true
-build_image = "public.ecr.aws/sam/build-python3.12:latest-arm64"
+build_image = "public.ecr.aws/sam/build-python3.12:1.136-arm64"
 use_container = true
 
 [dev.deploy.parameters]
@@ -98,7 +98,7 @@ stack_name = "cibo-tilerlayer-prod"
 [prod.build.parameters]
 cached = true
 parallel = true
-build_image = "public.ecr.aws/sam/build-python3.12:latest-arm64"
+build_image = "public.ecr.aws/sam/build-python3.12:1.136-arm64"
 use_container = true
 
 

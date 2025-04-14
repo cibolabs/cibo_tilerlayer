@@ -18,22 +18,25 @@
 
 PYTHON_VERSION := $(shell python3 -c 'import sys;print("{}.{}".format(sys.version_info[0], sys.version_info[1]))')
 
-NUMPY_VERSION:=1.26.4
-SQLITE_VERSION:=3450200
-TIFF_VERSION:=4.5.1
-PROJ_VERSION:=9.3.1
-GEOS_VERSION:=3.12.1
-GDAL_VERSION:=3.8.4
+NUMPY_VERSION:=2.1.0
+SQLITE_VERSION:=3490100
+SQLITE_YEAR:=2025
+TIFF_VERSION:=4.7.0
+PROJ_VERSION:=9.6.0
+GEOS_VERSION:=3.13.1
+GDAL_VERSION:=3.10.3
 
 export LD_LIBRARY_PATH := $(ARTIFACTS_DIR)/python/lib:$(ARTIFACTS_DIR)/python/lib64:${LD_LIBRARY_PATH}
 export PATH := $(ARTIFACTS_DIR)/python/bin:${PATH}
 export PYTHONPATH := $(ARTIFACTS_DIR)/python/lib/python$(PYTHON_VERSION)/site-packages
+# This seems to be where everything is installed (?)
+LIB_DIR:=/opt/python/lib
 
 build-CiboTilerLayer: prereqs pip numpy sqlite tiff proj geos gdal clean
 
 prereqs:
 	dnf install -y automake zlib-devel gcc gcc-c++ \
-         wget tar zip bzip2 swig make cmake libcurl-devel patch
+         wget tar zip bzip2 swig make cmake libcurl-devel patch patchelf
 	dnf clean all
 
 pip:
@@ -62,10 +65,10 @@ numpy:
 
 sqlite:
 	cd /tmp
-	wget -q https://www.sqlite.org/2024/sqlite-autoconf-$(SQLITE_VERSION).tar.gz
+	wget -q https://www.sqlite.org/$(SQLITE_YEAR)/sqlite-autoconf-$(SQLITE_VERSION).tar.gz
 	tar xf sqlite-autoconf-$(SQLITE_VERSION).tar.gz
 	cd sqlite-autoconf-$(SQLITE_VERSION)
-	CFLAGS="-O2 -Wl,-S" ./configure --enable-static=no --prefix=$(ARTIFACTS_DIR)/python
+	CFLAGS="-O2 -Wl,-S" ./configure --disable-static --prefix=$(ARTIFACTS_DIR)/python
 	make -j2 && make install
 	cd ..
 	rm -rf sqlite-autoconf-$(SQLITE_VERSION).tar.gz sqlite-autoconf-$(SQLITE_VERSION)
@@ -78,6 +81,7 @@ tiff:
 	mkdir -p build
 	cd build
 	cmake -D cxx=OFF -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_PREFIX_PATH=$(ARTIFACTS_DIR)/python \
+	  -DCMAKE_INSTALL_RPATH=$(LIB_DIR) \
 	  -D CMAKE_INSTALL_PREFIX=$(ARTIFACTS_DIR)/python -D CMAKE_INSTALL_LIBDIR=lib .. 2>&1
 	make -j2 && make install
 	cd ../..
@@ -91,7 +95,7 @@ proj:
 	mkdir build
 	cd build
 	cmake -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_PREFIX_PATH=$(ARTIFACTS_DIR)/python \
-	  -D BUILD_TESTING=OFF \
+	  -D BUILD_TESTING=OFF -DCMAKE_INSTALL_RPATH=$(LIB_DIR) \
 	  -D CMAKE_INSTALL_PREFIX=$(ARTIFACTS_DIR)/python -D CMAKE_INSTALL_LIBDIR=lib .. 2>&1
 	make -j2 && make install
 	cd ../..
@@ -105,8 +109,8 @@ geos:
 	mkdir build
 	cd build
 	cmake -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_PREFIX_PATH=$(ARTIFACTS_DIR)/python \
-	  -D BUILD_TESTING=OFF \
-	  -D CMAKE_INSTALL_PREFIX=$(ARTIFACTS_DIR)/python \ -DCMAKE_INSTALL_LIBDIR=lib .. 2>&1
+	  -D BUILD_TESTING=OFF -DCMAKE_INSTALL_RPATH=$(LIB_DIR) \
+	  -D CMAKE_INSTALL_PREFIX=$(ARTIFACTS_DIR)/python -DCMAKE_INSTALL_LIBDIR=lib .. 2>&1
 	make -j2 2>&1
 	make install
 	cd ../..
@@ -122,11 +126,17 @@ gdal:
 	cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF -DGDAL_ENABLE_DRIVER_PNG=ON \
 	  -DGDAL_USE_PNG_INTERNAL=ON -DCMAKE_PREFIX_PATH=$(ARTIFACTS_DIR)/python \
 	  -DCMAKE_INSTALL_PREFIX=$(ARTIFACTS_DIR)/python -DCMAKE_BUILD_TYPE=MinSizeRel \
-	  -DCMAKE_INSTALL_LIBDIR=lib -DPython_ROOT=/var/lang .. 2>&1
+	  -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_RPATH=$(LIB_DIR) .. 2>&1
 	make -j2 2>&1
 	make install
 	cd ../..
 	rm -rf gdal-$(GDAL_VERSION).tar.gz gdal-$(GDAL_VERSION)
+	# https://github.com/OSGeo/gdal/issues/10432
+	patchelf --set-rpath /opt/python/lib $(ARTIFACTS_DIR)/python/lib/python$(PYTHON_VERSION)/site-packages/osgeo/*.so
+	# For some reason the actual location of sqlite gets written (under /tmp/samcli/artifacts)
+	# rather than the rpath we asked for. Rewrite it.
+	# Do this now because doing it earlier breaks GDAL's linking
+	patchelf --remove-needed $(ARTIFACTS_DIR)/python/lib/libsqlite3.so --add-needed /opt/python/lib/libsqlite3.so $(ARTIFACTS_DIR)/python/lib/libproj.so
 
 clean:
 	# Flag fancy stripping of .py files (and just using pyc) for now

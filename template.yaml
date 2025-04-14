@@ -107,7 +107,7 @@ Resources:
           POWERTOOLS_SERVICE_NAME: PowertoolsOziusAPI
           POWERTOOLS_METRICS_NAMESPACE: API
           POWERTOOLS_LOG_LEVEL: INFO
-          LD_LIBRARY_PATH: "/opt/python/lib:/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/opt/lib"
+          #LD_LIBRARY_PATH: "/opt/python/lib:/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/opt/lib"
           GDAL_DATA: "/opt/python/share/gdal"
           PROJ_LIB: "/opt/python/share/proj"
           GDAL_CACHEMAX: "75%"
