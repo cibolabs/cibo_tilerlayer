@@ -175,7 +175,7 @@ def getTile(filename, z, x, y, bands=None, rescaling=None, colormap=None,
 
             else:
                 if len(rescaling) != len(bands):
-                    raise ValueError("length of rescaling doesn't math number of bands")
+                    raise ValueError("length of rescaling doesn't match number of bands")
                 for n, (minVal, maxVal) in enumerate(rescaling):
                     minMaxRange = maxVal - minVal
                     rescaleddata = (data[n].astype(float) - minVal).clip(min=0) * (maxOutVal / minMaxRange)
@@ -394,7 +394,7 @@ def getTileMosaic(filenames, z, x, y, bands=None, rescaling=None, colormap=None,
 
             else:
                 if len(rescaling) != len(bands):
-                    raise ValueError("length of rescaling doesn't math number of bands")
+                    raise ValueError("length of rescaling doesn't match number of bands")
                 for data, dataslice, nodataForBands in results:
                     for n, (minVal, maxVal) in enumerate(rescaling):
                         minMaxRange = maxVal - minVal
